@@ -1,9 +1,9 @@
-function [varargout] = dfft(t,X,n,dim,varargin)
-%% [f,Y] = dfft(t,X,n,dim,...)
-% This function takes the ... 
+function [Y] = dwin(X,win,dim)
+%% [Y] = dwin(X,dim)
+% This function appl
 %
 % SYNTAX
-% 
+
 
 %% Parse input
 narginchk(2,Inf);
@@ -30,7 +30,7 @@ end
 
 t = t(:);
 dt = mean(diff(t));
-assert(dt>0,'dimensional-fft-tools:Invalid t','''t'' must be monotonically increasing vector');
+assert(dt>0,'afft:Invalid t','''t'' must be monotonically increasing vector');
 
 p = inputParser;
 p.KeepUnmatched = true;
