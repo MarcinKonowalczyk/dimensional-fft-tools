@@ -1,13 +1,18 @@
-function [Y,P,S,Mu] = dwin(X,o,dim)
-%% [Y] = dwin(X,n,dim)
-% This function subtracts the n'th order polynomial background function
+function [varargout] = dbkg(X,o,dim,varargin)
+%% [Y,P,S,Mu] = dbkg(X,o,dim)
+% This function fits (subtracts) the n'th order polynomial background function
 % from the data along the 'dim' dimention
 %
 % SYNTAX
-
+%
+% EXAMPLES
+%
+%  for j = 1:16;
+%      A(:,:,j) = conv2(magic(64),magic(j),'same');
+%  end
 
 %% Parse input
-narginchk(1,3);
+narginchk(1,Inf);
 nargoutchk(0,4);
 
 sizeX = size(X);
@@ -20,7 +25,6 @@ else
     sliceDone = false(1,notDimSizeX);
 end
 
-keyboard
 %{
 if isequal(X_size,[1 1]);
     if nargout < 2
@@ -42,76 +46,120 @@ if nargin < 2 || isempty(o)
     o = 0;
 end
 
-%{
+%
 p = inputParser;
 p.KeepUnmatched = true;
-addOptional(p,'abs',true);
-addOptional(p,'trim',true);
+addOptional(p,'output','subtract');
+addOptional(p,'plot',0);
 parse(p,varargin{:});
 opt = p.Results;
-%}
+%
 
+%%
+
+cleaners = {};
+warningState = warning('off','backtrace');
+cleaners{end+1} = onCleanup(@() warning(warningState));
+
+%%
 Y = zeros(size(X));
 
 n = size(X,dim);
 
-%order = [dim 1:dim-1 dim+1:length(size(X))]; % Permute dimention of interest to beginning
-%iorder = [2:dim-1 1 dim:order(1)]; % Inverse permute
-
-S.type = '()';
+sDim.type = '()';
+sNotDim.type = '()';
 subs = cell(1,ndims(X)); % Initialise subs
+
+if nargout > 1
+    P = zeros([o+1 notDimSizeX]);
+end
+if nargout > 2
+    S = cell(notDimSizeX);
+end
+if nargout > 3
+    Mu = zeros([2 notDimSizeX]);
+end
+
+iiDisplayStep = fix(numel(X)./10); % Step to display ~ 20 notifications
+
+flagWarning = false;
 for ii = 1:numel(X) % For each element of X
     [subs{:}] = ind2sub(sizeX,ii); % Convert linear index to subscripts
-    subs(dim); % Subscript of the dimention of interest
-    S.subs = subs(notDim);
+    sNotDim.subs = subs(notDim);
     
-    if subsref(sliceDone,S), continue, end;
+    if ~mod(ii,iiDisplayStep), fprintf('%3.3f %% done\n',ii./numel(X).*100), end;
+    if subsref(sliceDone,sNotDim), continue, end;
     
-    Y = subsasgn(Y,S,true);
+    subs{dim} = ':';
+    sDim.subs = subs;
     
-    sliceDone = subsasgn(sliceDone,S,true);
-end
-
-
-p = zeros(o+1,n);
-for j = 1:numel(X)
+    slice = subsref(X,sDim);
+    slice = slice(:)';
     
-end
-
-
-
-
-
-%% Subscript along the specified dimention
-S.type = '()';
-S.subs = num2cell(repmat(':',1,length(size(X))));
-
-iseven = ~mod(o,2); % Is number of fft points even
-if iseven
-    len = o/2+1;
-    f = linspace(0,0.5,len)./dt;
-else
-    len = ceil(o/2);
-    f = linspace(0,0.5 - 1/o, len)./dt;
-end
-
-S.subs{dim} = 1:len;
-Y = subsref(Y,S);
-
-if opt.trim
-    if iseven
-        S.subs{dim} = 2:len-1;
-    else
-        S.subs{dim} = 2:len;
+    [p,s,mu] = polyfit(1:n,slice,o);
+    
+    if nargout > 1 % Polynomial fit coeffs
+        sForP.type = '()';
+        sForP.subs = {':' , subs{notDim}};
+        P = subsasgn(P,sForP,p);
     end
-    Y = subsasgn(Y,S,2.*subsref(Y,S));
+    if nargout > 2 % Error estimates structure
+        sForS.type = '{}';
+        sForS.subs = subs(notDim);
+        S = subsasgn(S,sForS,s);
+    end
+    if nargout > 3 % 
+        sForMu.type = '()';
+        sForMu.subs = {':' , subs{notDim}};
+        Mu = subsasgn(Mu,sForMu,mu);
+    end
+    
+    [fit,~] = polyval(p,1:n,s,mu); % <- WIP: delta
+    
+    % Plot of the fit
+    if opt.plot > 1
+        figure(1);
+        plot(1:n,slice,'.',1:n,fit,'-');
+        grid on; drawnow; pause(0.01);
+    end
+    
+    % Subtract(/divide/fit) background
+    switch opt.output
+        case 'subtract'
+            slice = slice - fit;
+        case 'divide'
+            slice = slice./fit - 1;
+        case 'fit'
+            slice = fit;
+    end
+    
+    % Assign into Y
+    Y = subsasgn(Y,sDim,slice);
+    
+    % Mark slice as done
+    sliceDone = subsasgn(sliceDone,sNotDim,true);
 end
 
-% Output
-if nargout <2
-    varargout = {Y};
-else % nargout == 2
-    varargout = {Y,f};
+% Throw a warning if one occured during polyfit
+if flagWarning
+    warning(me);
+end
+
+varargout = {Y};
+if nargout > 1
+    order = [dim 1:dim-1 dim+1:length(size(X))]; % Permute dimention of interest to beginning
+    iOrder = [2:dim 1 dim+1:order(end)]; % Inverse permute
+    sOrder = [1:dim-1 length(size(X)) dim:length(size(X))-1];
+    P = permute(P,iOrder);
+    varargout{end+1} = P;
+end
+if nargout > 2
+    S = permute(S,sOrder);
+    varargout{end+1} = S;
+end
+if nargout > 3
+    Mu = permute(Mu,iOrder);
+    varargout{end+1} = Mu;
 end
 
 end
