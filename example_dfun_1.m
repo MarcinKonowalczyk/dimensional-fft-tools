@@ -2,7 +2,7 @@ close all; clear; clc;
 
 load('test-data.mat');
 
-Y0 = dfun(A,@std,2);
+Y0 = dfun(A,@std,2,{[],1});
 
 figure(1);
 subplot(2,2,1);

@@ -82,7 +82,6 @@ end
 
 iiDisplayStep = fix(numel(X)./10); % Step to display ~ 20 notifications
 
-flagWarning = false;
 for ii = 1:numel(X) % For each element of X
     [subs{:}] = ind2sub(sizeX,ii); % Convert linear index to subscripts
     sNotDim.subs = subs(notDim);
@@ -138,11 +137,6 @@ for ii = 1:numel(X) % For each element of X
     
     % Mark slice as done
     sliceDone = subsasgn(sliceDone,sNotDim,true);
-end
-
-% Throw a warning if one occured during polyfit
-if flagWarning
-    warning(me);
 end
 
 varargout = {Y};
