@@ -20,13 +20,20 @@ function Y = dfun(X,fun,dim,funargs,varargin)
 %            allways be a collumn vector.
 %
 % OPTIONS
+% Options are given as name-value pairs into varargin.
 %  'verbosity' - Flag which controlls the output of the function to the
 %  (true)        console. This can be usefull when the @fun is expected to
 %                take a long time, or X is large.
-%  'plot'      - Flag which controlls plotting of the slices though X in
-%  (flase)       the folr loop. Use only when neccessary - e.g. for
-%                debugging your @fun.
-%                
+%  'plot'      - Controlls plotting of the slices though X in the for loop.
+%  (flase)       Use only when neccessary - e.g. for debugging your @fun.
+%  'advinput'  - Controlls the nature of input into @fun. If this option is
+%  (false)       set to 'true', the input into @fun changes to 
+%                `fun(sliceThoughX,S,funargs{:})`, where `S` is a structure
+%                describing hte access method to the particular slice
+%                though X. See documentation for `subsref` for details.
+%                This should be used with caution as it changes the format
+%                to the @fun required by the function.
+%
 % EXAMPLES
 %  Work In Progress
 %   for j = 1:16;
@@ -40,14 +47,15 @@ nargoutchk(0,1);
 if isempty(X) || isempty(fun); Y = X; return; end; % Return Y = X if X or @fun are empty
 sizeX = size(X);
 
-assert(isa(fun,'function_handle'),'dfun:invalid-input','''fun'' must be a function handle, not %s',class(fun));
+assert(isa(fun,'function_handle'),'MATLAB:dfun:invalidInput','@fun must be a function handle, not %s',class(fun));
+assert(nargout(fun) ~= 0,'dfun:invalidInput','@fun must be a function which provides outputs');
 
 % Default of 'dim': Find first nonsingleton dimention of X
 if nargin < 3 || isempty(dim);
     dim = find(sizeX ~= 1,1);
 else
-    assert(isnumeric(dim),'dfun:invalid-input','''dim'' must be numeric, not a %s');
-    assert(isequal(size(dim),[1 1]),'dfun:invalid-input','''dim'' must be a single number, not %s',mat2str(size(dim)));
+    assert(isnumeric(dim),'dfun:invalidInput','`dim` must be numeric, not a %s');
+    assert(isequal(size(dim),[1 1]),'dfun:invalidInput','`dim` must be a single number, not %s',mat2str(size(dim)));
 end
 
 % Default of 'funargs': No additional @fun arguments
@@ -60,10 +68,12 @@ elseif ~isa(funargs,'cell');
 end
 
 % Parse the options
+validFlag = @(x) islogical(x) && isequal(size(x),[1 1]); % Is a valid T/F flag
 p = inputParser;
 p.KeepUnmatched = true;
-addOptional(p,'verbosity',true);
-addOptional(p,'plot',false);
+addOptional(p,'verbosity',true,validFlag);
+addOptional(p,'plot',false,validFlag);
+addOptional(p,'advinput',false,validFlag);
 % WIP: option to time the execution of the @funs ?? (<- not sure if necessary)
 parse(p,varargin{:});
 opt = p.Results;
@@ -71,13 +81,40 @@ opt = p.Results;
 
 %% Stuff
 cleaners = {};
-warningState = warning('off','backtrace');
-cleaners{end+1} = onCleanup(@() warning(warningState)); %#ok<NASGU>
+warningState = warning('off','backtrace'); % Set warning backtrace to `off`
+cleaners{end+1} = onCleanup(@() warning(warningState)); % Return warnings to previous state when out of scope
 
-teapot = MException('dfun:E418','I''m a teapot'); % Idiot error. This should never happen.
+teapot = MException('dfun:Error418','I''m a teapot'); % Idiot error. This should never happen.
+
+%% Create internal fun
+% Number of outputs of the original @fun
+if nargout(fun) > 0
+    nargoutFun = nargout(fun); 
+elseif nargout(fun) == -1;
+    % @fun is probably a function handle. These will always give only one output.
+    % It's also possible @fun's only output is 'varargout'. Therefore issue a warning about that.
+    nargoutFun = 1;
+    warning('dfun:invalidInput','Assuming that @fun has only one output argument');
+elseif nargout(fun) < -1;
+    % @fun has 'varargout'
+    % Number of arguments out minus varargout
+    nargoutFun = abs(nargout(fun) + 1);
+    warning('dfun:invalidInput','Ignoring `varargout` in the output of the @fun');
+elseif nargout(fun) == 0;
+    thow(teapot);
+end
+
+stringFun = func2str(fun);
+if ~strcmp(stringFun(1),'@'), stringFun = ['@' stringFun]; end; % Make sure stringfun starts with `@`
+
+if opt.advinput
+    fun = @(x,S) feval(fun,x,S,funargs{:});
+else
+    fun = @(x) feval(fun,x,funargs{:});
+end
 
 %% Determine the nature of the output of @fun
-if nargout(fun) > 1
+if nargoutFun > 1
     opt.mode = 'cell';
 else
     % Apply @fun to a dummy slice
@@ -85,7 +122,13 @@ else
     [subs{:}] = ind2sub(sizeX,randi([1 numel(X)])); % Take a random point in X
     subs{dim} = ':'; % Make it a slice in the correct dimention
     sDummy.type = '()'; sDummy.subs = subs; % Create the subscript struct
-    sDO = feval(fun,subsref(X,sDummy),funargs{:}); % Dummy output of @fun; sampleDummyOutput
+    % Dummy output of @fun; sampleDummyOutput
+    if opt.advinput
+        subs{dim} = []; subs = cell2mat(subs);
+        sDO = fun(subsref(X,sDummy),subs);
+    else
+        sDO = fun(subsref(X,sDummy));
+    end
 
     % Determine the output mode
     % WIP: Add support for the output to be larger than a vector in the matrix mode (has to add dimentions to Y)
@@ -113,7 +156,7 @@ end
 %% Initialise the output variable according to the opt.mode
 switch opt.mode
     case {'numeric-one', 'numeric-vector'}
-        % Y is a matrix where the dimention specified by 'dim' has the outputs of @fun
+        % Y is a matrix where the dimention specified by `dim` has the outputs of @fun
         sizeY = sizeX; sizeY(dim) = length(sDO);
         Y = zeros(sizeY,'like',sDO);
     case {'logical-one', 'logical-vector'}
@@ -122,7 +165,7 @@ switch opt.mode
         Y = false(sizeY);
     case 'cell'
         % Y is a cell array of the outputs of @fun
-        sizeY = sizeX; sizeY(dim) = nargout(fun);
+        sizeY = sizeX; sizeY(dim) = nargoutFun;
         Y = cell(sizeY);
     otherwise
         throw(teapot);
@@ -144,11 +187,13 @@ sSliceDone.type = '()';
 
 subs = cell(1,ndims(X)); % Initialise subs
 
-iiDisplayStep = fix(numel(X)./10); % Step to display ~ 20 notifications
+iiDisplayStep = fix(numel(X)./100); % Step to display ~ 20 notifications
 
+if opt.verbosity, fprintf('fdim running with @fum = %.30s: 000%%',stringFun); end;
+if opt.verbosity, cleaners{end+1} = onCleanup(@() fprintf('\n')); end; %#ok<NASGU> % Print a new line character when out of scope
 for xi = 1:numel(X)
     % Display % done message
-    if ~mod(xi,iiDisplayStep) && opt.verbosity, fprintf('%3.3f %% done\n',xi./numel(X).*100), end;
+    if ~mod(xi,iiDisplayStep) && opt.verbosity, fprintf('\b\b\b\b%03.f%%',xi./numel(X).*100), end;
     
     % Get the index of the xi'th element of X
     [subs{:}] = ind2sub(sizeX,xi); % Convert linear index to subscripts
@@ -163,25 +208,32 @@ for xi = 1:numel(X)
     slice = slice(:); % Ensures that slice is a column vector
     
     % Collect outputs of feval
+    % https://uk.mathworks.com/matlabcentral/answers/96038-how-can-i-capture-an-unknown-number-of-output-arguments-in-a-cell-array-in-matlab-7-5-r2007b#answer_216954
+    % WIP: Add try, catch mechanics
+    % WIP: Catch warnings and thow them only once. Print the progress bar correctly.
+    sliceOutput = cell(1,nargoutFun); % Prepare the sliceOutput cell to catch the outputs fo feval
+    if opt.advinput
+        [sliceOutput{:}] = fun(slice,sSliceX); % Evaluate the @fun on slice
+    else
+        [sliceOutput{:}] = fun(slice); % Evaluate the @fun on slice
+    end
+    
+    % Prepare to slice into Y
     switch opt.mode
         % WIP: test test test
-        % WIP: Add try, catch mechanics
         case {'numeric-one', 'logical-one'}
-            sliceOutput = feval(fun,slice,funargs{:}); % Evaluate the @fun on slice
+            sliceOutput = sliceOutput{1}; % Only one output
             sSliceY.type = '()'; sSliceY.subs = subs; sSliceY.subs{dim} = 1; % Create the subscript struct
         case {'numeric-vector', 'logical-vector'}
-            sliceOutput = feval(fun,slice,funargs{:}); % Evaluate the @fun on slice
+            sliceOutput = sliceOutput{1}; % Only one output
             sSliceY.type = '()'; sSliceY.subs = subs; sSliceY.subs{dim} = ':'; % Create the subscript struct
         case 'cell'
-            % https://uk.mathworks.com/matlabcentral/answers/96038-how-can-i-capture-an-unknown-number-of-output-arguments-in-a-cell-array-in-matlab-7-5-r2007b#answer_216954
-            sliceOutput = cell(1,nargout(fun)); % Prepare the slice output cell
-            [sliceOutput{:}] = feval(fun,slice,funargs{:}); % Evaluate the @fun on slice
-            sSliceY.type = '{}'; sSliceY.subs = subs; sSliceY.subs{dim} = nargout(fun); % Create the subscript struct
+            sSliceY.type = '{}'; sSliceY.subs = subs; sSliceY.subs{dim} = nargoutFun; % Create the subscript struct
         otherwise
             throw(teapot);
     end
     
-    % Put the outputs into Y
+    % Slice the outputs into Y
     Y = subsasgn(Y,sSliceY,sliceOutput);
 
     % Mark slice as done
