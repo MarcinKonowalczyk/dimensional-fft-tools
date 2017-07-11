@@ -68,14 +68,14 @@ narginchk(2,Inf); % X and @fun are required
 nargoutchk(0,1);
  
 assert(~isa(X,'cell'),'dfun:invalidInput','`X` musn''t be a cell array');
-if isempty(X) || isempty(fun); Y = X; return; end; % Return Y = X if X or @fun are empty
+if isempty(X) || isempty(fun); Y = X; return; end % Return Y = X if X or @fun are empty
 sizeX = size(X);
  
 assert(isa(fun,'function_handle'),'MATLAB:dfun:invalidInput','@fun must be a function handle, not %s',class(fun));
 assert(nargout(fun) ~= 0,'dfun:invalidInput','@fun must be a function which provides outputs');
  
 % Default of 'dim': Find first non-singleton dimension of X
-if nargin < 3 || isempty(dim);
+if nargin < 3 || isempty(dim)
     dim = find(sizeX ~= 1,1);
 else
     assert(isnumeric(dim),'dfun:invalidInput','`dim` must be numeric, not a %s');
@@ -85,13 +85,13 @@ end
 % Default of 'funargs': No additional @fun arguments
 if nargin < 4 || isempty(funargs)
     funargs = {};
-elseif ~isa(funargs,'cell');
+elseif ~isa(funargs,'cell')
     % Put funargs into a cell for input into feval
     % Nothing to assert about funargs. It can be anything.
     funargs = {funargs};
 end
  
-% Parse the options
+%% Parse the options
 validFlag = @(x) islogical(x) && isequal(size(x),[1 1]); % Is a valid T/F flag
 p = inputParser;
 p.KeepUnmatched = true;
@@ -114,22 +114,22 @@ teapot = MException('dfun:Error418','I''m a teapot'); % Idiot error. This should
 % Number of outputs of the original @fun
 if nargout(fun) > 0
     nargoutFun = nargout(fun); 
-elseif nargout(fun) == -1;
+elseif nargout(fun) == -1
     % @fun is probably a function handle. These will always give only one output.
     % It's also possible @fun's only output is 'varargout'. Therefore issue a warning about that.
     nargoutFun = 1;
     warning('dfun:invalidInput','Assuming that @fun has only one output argument');
-elseif nargout(fun) < -1;
+elseif nargout(fun) < -1
     % @fun has 'varargout'
     % Number of arguments out minus varargout
     nargoutFun = abs(nargout(fun) + 1);
     warning('dfun:invalidInput','Ignoring `varargout` in the output of the @fun');
-elseif nargout(fun) == 0;
-    thow(teapot);
+elseif nargout(fun) == 0
+    throw(teapot);
 end
  
 stringFun = func2str(fun);
-if ~strcmp(stringFun(1),'@'), stringFun = ['@' stringFun]; end; % Make sure stringfun starts with `@`
+if ~strcmp(stringFun(1),'@'), stringFun = ['@' stringFun]; end % Make sure stringfun starts with `@`
  
 if opt.advinput
     fun = @(x,S) feval(fun,x,S,funargs{:});
@@ -160,7 +160,7 @@ else
     if isnumeric(sDO) % Numeric output
         if isequal(size(sDO),[1 1])
             opt.mode = 'numeric-one';
-        elseif isvector(sDO);
+        elseif isvector(sDO)
             opt.mode = 'numeric-vector';
         else
             opt.mode = 'cell';
@@ -168,7 +168,7 @@ else
     elseif islogical(sDO) % Logical output
         if isequal(size(sDO),[1 1])
             opt.mode = 'logical-one';
-        elseif isvector(sDO);
+        elseif isvector(sDO)
             opt.mode = 'logical-vector';
         else
             opt.mode = 'cell';
@@ -214,18 +214,18 @@ subs = cell(1,ndims(X)); % Initialise subs
  
 iiDisplayStep = fix(numel(X)./100); % Step to display ~ 20 notifications
  
-if opt.verbosity, fprintf('fdim running with @fum = %.30s: 000%%',stringFun); end;
-if opt.verbosity, cleaners{end+1} = onCleanup(@() fprintf('\n')); end; %#ok<NASGU> % Print a new line character when out of scope
+if opt.verbosity, fprintf('fdim running with @fum = %.30s: 000%%',stringFun); end
+if opt.verbosity, cleaners{end+1} = onCleanup(@() fprintf('\n')); end %#ok<NASGU> % Print a new line character when out of scope
 for xi = 1:numel(X)
     % Display % done message
-    if ~mod(xi,iiDisplayStep) && opt.verbosity, fprintf('\b\b\b\b%03.f%%',xi./numel(X).*100), end;
+    if ~mod(xi,iiDisplayStep) && opt.verbosity, fprintf('\b\b\b\b%03.f%%',xi./numel(X).*100), end
     
     % Get the index of the xi'th element of X
     [subs{:}] = ind2sub(sizeX,xi); % Convert linear index to subscripts
     
     % Check if slice already done
     sSliceDone.subs = subs(sliceDoneDim);
-    if subsref(sliceDone,sSliceDone), continue, end;
+    if subsref(sliceDone,sSliceDone), continue, end
     
     % Slice X
     sSliceX.subs = subs; sSliceX.subs{dim} = ':';
