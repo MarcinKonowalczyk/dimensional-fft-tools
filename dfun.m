@@ -1,5 +1,5 @@
-function [varargout] = dbkg(X,o,dim,varargin)
-%% [Y,P,S,Mu] = dbkg(X,o,dim,...)
+function Y = dfun(X,fun,dim,varargin)
+%% Y = dfun(X,fun,dim,...)
 % This function fits (subtracts) the n'th order polynomial background function
 % from the data along the 'dim' dimention
 %
@@ -8,7 +8,7 @@ function [varargout] = dbkg(X,o,dim,varargin)
 % EXAMPLES
 %
 %  for j = 1:16;
-%      A(:,:,j) = conv2(magic(64),magic(j),'same');
+%      A(:,:,j) = conv2(peaks(64),magic(j),'same');
 %  end
 
 %% Parse input
@@ -41,19 +41,14 @@ if nargin < 3 || isempty(dim);
     dim = find(sizeX ~= 1,1);
 end
 
-if nargin < 2 || isempty(o)
-    % Default to a 0'th order polynomial
-    o = 0;
-end
-
-%
+%{
 p = inputParser;
 p.KeepUnmatched = true;
 addOptional(p,'output','subtract');
 addOptional(p,'plot',0);
 parse(p,varargin{:});
 opt = p.Results;
-%
+%}
 
 %%
 
@@ -61,24 +56,65 @@ cleaners = {};
 warningState = warning('off','backtrace');
 cleaners{end+1} = onCleanup(@() warning(warningState));
 
-%%
-Y = zeros(sizeX);
+%% Determine the nature of the output of @fun
+if nargout(fun) > 1
+    opt.mode = 'cell';
+else
+    % Apply @fun to a dummy slice
+    [subs{:}] = ind2sub(sizeX,randi([1 numel(X)])); % Take a random point in X
+    subs{dim} = ':'; % Make it a slice in the correct dimention
+    sDummy.type = '()'; sDummy.subs = subs; % Create the subscript struct
+    sDO = feval(fun,subsref(X,sDummy)); % Dummy output of @fun; sampleDummyOutput
 
+    % Determine the output mode
+    % WIP: Add support for the output to be larger than a vector in the matrix mode (has to add dimentions to Y)
+    if isnumeric(sDO) % Numeric output
+        if isequal(size(sDO),[1 1])
+            opt.mode = 'numeric-one';
+        elseif isvector(sDO);
+            opt.mode = 'numeric-vector';
+        else
+            opt.mode = 'cell';
+        end
+    elseif islogical(sDO) % Logical output
+        if isequal(size(sDO),[1 1])
+            opt.mode = 'logical-one';
+        elseif isvector(sDO);
+            opt.mode = 'logical-vector';
+        else
+            opt.mode = 'cell';
+        end
+    else
+        opt.mode = 'cell';
+    end
+end
+
+%% Initialise the output variable according to the opt.mode
+switch opt.mode
+    case 'numeric-one'
+        sizeY = sizeX; sizeY(dim) = 1;
+        Y = zeros(sizeY,'like',sDO);
+    case 'numeric-vector'
+        sizeY = sizeX; sizeY(dim) = length(sDO);
+        Y = zeros(sizeY,'like',sDO);
+    case 'logical-one'
+        sizeY = sizeX; sizeY(dim) = 1;
+        Y = false(sizeY);
+    case 'logical-vector'
+        sizeY = sizeX; sizeY(dim) = length(sDO);
+        Y = false(sizeY);
+    case 'cell'
+        %
+        sizeY = sizeX; sizeY(dim) = 1;
+        Y = cell(sizeY);
+    otherwise
+        error('dfun:E418','I''m a teapot');
+end
 n = size(X,dim);
 
 sDim.type = '()';
 sNotDim.type = '()';
 subs = cell(1,ndims(X)); % Initialise subs
-
-if nargout > 1
-    P = zeros([o+1 notDimSizeX]);
-end
-if nargout > 2
-    S = cell(notDimSizeX);
-end
-if nargout > 3
-    Mu = zeros([2 notDimSizeX]);
-end
 
 iiDisplayStep = fix(numel(X)./10); % Step to display ~ 20 notifications
 
@@ -96,53 +132,16 @@ for ii = 1:numel(X) % For each element of X
     slice = subsref(X,sDim);
     slice = slice(:)';
     
-    [p,s,mu] = polyfit(1:n,slice,o);
-    
-    if nargout > 1 % Polynomial fit coeffs
-        sForP.type = '()';
-        sForP.subs = {':' , subs{notDim}};
-        P = subsasgn(P,sForP,p);
-    end
-    if nargout > 2 % Error estimates structure
-        sForS.type = '{}';
-        sForS.subs = subs(notDim);
-        S = subsasgn(S,sForS,s);
-    end
-    if nargout > 3 % 
-        sForMu.type = '()';
-        sForMu.subs = {':' , subs{notDim}};
-        Mu = subsasgn(Mu,sForMu,mu);
-    end
-    
-    [fit,~] = polyval(p,1:n,s,mu); % <- WIP: delta
-    
-    % Plot of the fit
-    if opt.plot > 1
-        figure(1);
-        plot(1:n,slice,'.',1:n,fit,'-');
-        grid on; drawnow; pause(0.01);
-    end
-    
-    % Subtract(/divide/fit) background
-    switch opt.output
-        case 'subtract'
-            slice = slice - fit;
-        case 'divide'
-            slice = slice./fit - 1;
-        case 'fit'
-            slice = fit;
-    end
+    % Collect outputs of feval
+    % (https://uk.mathworks.com/matlabcentral/answers/96038-how-can-i-capture-an-unknown-number-of-output-arguments-in-a-cell-array-in-matlab-7-5-r2007b#answer_216954)
+    sDO = cell(1,nargout(fun));
+    [sDO{:}] = feval(fun,slice);
     
     % Assign into Y
     Y = subsasgn(Y,sDim,slice);
     
     % Mark slice as done
     sliceDone = subsasgn(sliceDone,sNotDim,true);
-end
-
-% Throw a warning if one occured during polyfit
-if flagWarning
-    warning(me);
 end
 
 varargout = {Y};
