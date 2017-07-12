@@ -214,7 +214,7 @@ subs = cell(1,ndims(X)); % Initialise subs
  
 iiDisplayStep = fix(numel(X)./100); % Step to display ~ 20 notifications
  
-if opt.verbosity, fprintf('fdim running with @fum = %.30s: 000%%',stringFun); end
+if opt.verbosity, fprintf('fdim running with @fun = %.30s: 000%%',stringFun); end
 if opt.verbosity, cleaners{end+1} = onCleanup(@() fprintf('\n')); end %#ok<NASGU> % Print a new line character when out of scope
 
 for xi = 1:numel(X)
