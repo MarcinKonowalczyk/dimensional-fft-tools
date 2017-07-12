@@ -1,9 +1,9 @@
-### dimensional-fft-tools
+## dimensional-fft-tools
 This is a MATLAB toolbox for one-dimensional fft operations on multidimensional datasets.
 
 A part of this toolbox - dfun is already published as an independent function [on Mathworks](https://uk.mathworks.com/matlabcentral/fileexchange/63686-dfun). I will maintain it there as a latest stable release. This repository will have the bleeding-edge version in it.
 
-#### About
+### About
 Large datasets (arrays) are, and always will be, an inherent part of physical sciences.
 Each dimension represents a different dimension of a dataset while the values themselves are the variable of interest.
 
@@ -14,7 +14,7 @@ This will mean that the signal of interest will oscillate at that frequency and 
 The issue they then run into is that their data is a 4D array of absorbance values which they need to perform analysis on - for each 1D slice though the 4th dimension i.e. the burst of spectra, they need to window the data, take the `fft`, select the correct subset thereof, subtract background, and finally integrate the peak of interest.
 This adds up to quite a heavy operation which, furthermore, needs to be nested in 4 `for`-loops indexing though all the dimensions. This toolbox aims to help with exactly these kind of tasks.
 
-#### ToDo's
+### ToDo's
  - Go through all the WIP and put them into this list
  - Add more toolbox description to this doc
  - Figure out how to avoid using sliceDone matrix. this should improve the performance (<- Major restructuring needed)
