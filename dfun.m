@@ -1,5 +1,5 @@
 function Y = dfun(X,fun,dim,funargs,varargin)
-%% Y = dfun(X,fun,dim,funsrgs,...)
+%% Y = dfun(X,fun,dim,funargs,...)
 % Applies a function specified by the function handle '@fun' to each 1D
 % slice of 'X' along the dimention 'dim'.
 %
@@ -28,7 +28,7 @@ function Y = dfun(X,fun,dim,funargs,varargin)
 % OPTIONS
 %  Options are given as name-value pairs into varargin.
 %   'verbosity' - Flag which controls the output of the function to the
-%   (true)        console. This can be useful when the @fun is expected to
+%   (false)        console. This can be useful when the @fun is expected to
 %                 take a long time, or X is large.
 %   'plot'      - Controls plotting of the slices though X in the for loop.
 %   (flase)       Use only when necessary - e.g. for debugging your @fun.
@@ -40,29 +40,30 @@ function Y = dfun(X,fun,dim,funargs,varargin)
 %                 This should be used with caution as it changes the format
 %                 to the @fun required by the function.
 %
-% EXAMPLES
-%  2D matrix of data operations with function handles
-%   load spectra % loads matlab sample data
-%   xBkg = [36 97 199 329]; % x for background correction
-%   NIR = dfun(NIR,@(y) y - polyval(polyfit(xBkg,y(xBkg),2),1:length(y)),2);
-%   dNIR = dfun(NIR,@(x) x - NIR(1,:),2); % Difference spectrum
-%   rmsNIR = dfun(dNIR,@(x) sqrt(mean(x.^2)),1);
-%   % Plot
-%   figure(1); subplot(2,2,1); contourf(NIR,'edgecolor','none'); grid on; title('NIR');
-%   set(gca,'XTickLabel','','YTickLabel','');
-%   subplot(2,2,2); contourf(dNIR,'edgecolor','none'); grid on; title('\deltaNIR');
-%   set(gca,'XTickLabel','','YTickLabel','');
-%   subplot(2,2,[3,4]); plot(rmsNIR); grid on; axis tight; title('NIR spectral rms');
-%   set(gca,'XTickLabel','');
+% EXAMPLE 1 - Near IR spectra (2D matrix) presentation using function handles
+%  load spectra % loads matlab sample data
+%  xBkg = [36 97 199 329]; % x for background correction
+%  NIR = dfun(NIR,@(y) y - polyval(polyfit(xBkg,y(xBkg),2),1:length(y)),2);
+%  dNIR = dfun(NIR,@(x) x - NIR(1,:),2); % Difference spectrum
+%  rmsNIR = dfun(dNIR,@(x) sqrt(mean(x.^2)),1);
+%  % Plot
+%  figure(1); subplot(2,2,1); contourf(NIR,'edgecolor','none'); grid on; title('NIR');
+%  set(gca,'XTickLabel','','YTickLabel','');
+%  subplot(2,2,2); contourf(dNIR,'edgecolor','none'); grid on; title('\deltaNIR');
+%  set(gca,'XTickLabel','','YTickLabel','');
+%  subplot(2,2,[3,4]); plot(rmsNIR); grid on; axis tight; title('NIR spectral rms');
+%  set(gca,'XTickLabel','');
 %
-%  When possible, use build-in functions
+% EXAMPLE 2 - When possible, use build-in functions
 %   load spectra % loads matlab sample data
 %   tic; NIR_std_1 = std(NIR,1,2); t_base = toc;
 %   tic; NIR_std_2 = dfun(NIR,@std,2,{1},'verbosity',false); t_dfun = toc;
 %   fprintf('The result of dfun is correct: %i\n',isequal(NIR_std_1,NIR_std_2));
 %   fprintf('dfun is ~%.1f times slower than in-build std() function\n',t_dfun./t_base);
 %
- 
+% Written by Marcin Konowalczyk
+% Timmel Group @ Oxford University
+
 %% Parse and validate input
 narginchk(2,Inf); % X and @fun are required
 nargoutchk(0,1);
@@ -72,14 +73,16 @@ if isempty(X) || isempty(fun); Y = X; return; end % Return Y = X if X or @fun ar
 sizeX = size(X);
  
 assert(isa(fun,'function_handle'),'MATLAB:dfun:invalidInput','@fun must be a function handle, not %s',class(fun));
-assert(nargout(fun) ~= 0,'dfun:invalidInput','@fun must be a function which provides outputs');
+nargoutFun = nargout(fun);
+assert(nargoutFun ~= 0,'dfun:invalidInput','@fun must be a function which provides outputs');
  
 % Default of 'dim': Find first non-singleton dimension of X
 if nargin < 3 || isempty(dim)
     dim = find(sizeX ~= 1,1);
 else
-    assert(isnumeric(dim),'dfun:invalidInput','`dim` must be numeric, not a %s');
+    assert(isnumeric(dim),'dfun:invalidInput','`dim` must be numeric, not a %s',class(dim));
     assert(isequal(size(dim),[1 1]),'dfun:invalidInput','`dim` must be a single number, not %s',mat2str(size(dim)));
+    assert(dim >= 1,'dfun:invalidInput','`dim` must be > 1. A value of %d  was supplied.',dim);
 end
  
 % Default of 'funargs': No additional @fun arguments
@@ -95,14 +98,13 @@ end
 validFlag = @(x) islogical(x) && isequal(size(x),[1 1]); % Is a valid T/F flag
 p = inputParser;
 p.KeepUnmatched = true;
-addOptional(p,'verbosity',true,validFlag);
+addOptional(p,'verbosity',false,validFlag);
 addOptional(p,'plot',false,validFlag); % WIP
 addOptional(p,'advinput',false,validFlag);
 % WIP: option to time the execution of the @funs ?? (<- not sure if necessary)
 parse(p,varargin{:});
 opt = p.Results;
- 
- 
+
 %% Stuff
 cleaners = {};
 warningState = warning('off','backtrace'); % Set warning backtrace to `off`
@@ -112,19 +114,17 @@ teapot = MException('dfun:Error418','I''m a teapot'); % Idiot error. This should
  
 %% Create internal fun
 % Number of outputs of the original @fun
-if nargout(fun) > 0
-    nargoutFun = nargout(fun); 
-elseif nargout(fun) == -1
+if nargoutFun == -1
     % @fun is probably a function handle. These will always give only one output.
     % It's also possible @fun's only output is 'varargout'. Therefore issue a warning about that.
     nargoutFun = 1;
     warning('dfun:invalidInput','Assuming that @fun has only one output argument');
-elseif nargout(fun) < -1
+elseif nargoutFun < -1
     % @fun has 'varargout'
     % Number of arguments out minus varargout
-    nargoutFun = abs(nargout(fun) + 1);
+    nargoutFun = abs(nargoutFun + 1);
     warning('dfun:invalidInput','Ignoring `varargout` in the output of the @fun');
-elseif nargout(fun) == 0
+elseif nargoutFun == 0
     throw(teapot);
 end
  
@@ -214,7 +214,7 @@ subs = cell(1,ndims(X)); % Initialise subs
  
 iiDisplayStep = fix(numel(X)./100); % Step to display ~ 20 notifications
  
-if opt.verbosity, fprintf('fdim running with @fun = %.30s: 000%%',stringFun); end
+if opt.verbosity, fprintf('fdim running with @fun = %.30s: 000%%',stringFun); end % Limit the function name to be only 30 characters long
 if opt.verbosity, cleaners{end+1} = onCleanup(@() fprintf('\n')); end %#ok<NASGU> % Print a new line character when out of scope
 
 for xi = 1:numel(X)
