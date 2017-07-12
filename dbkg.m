@@ -1,6 +1,6 @@
 function [varargout] = dbkg(X,o,dim,varargin)
 %% [Y,P,S,Mu] = dbkg(X,o,dim,...)
-% This function fits (subtracts) the n'th order polynomial background function
+% This function fits (& subtracts) the n'th order polynomial background function
 % from the data along the 'dim' dimention
 %
 % SYNTAX
@@ -25,17 +25,6 @@ else
     sliceDone = false(1,notDimSizeX);
 end
 
-%{
-if isequal(X_size,[1 1]);
-    if nargout < 2
-        varargout = {0};
-    else % nargout == 2
-        varargout = {X,NaN};
-    end
-    return;
-end
-%}
-
 if nargin < 3 || isempty(dim);
     % Find first nonsingleton dimention of X
     dim = find(sizeX ~= 1,1);
@@ -46,31 +35,22 @@ if nargin < 2 || isempty(o)
     o = 0;
 end
 
-%
 p = inputParser;
 p.KeepUnmatched = true;
 addOptional(p,'output','subtract');
 addOptional(p,'plot',0);
 parse(p,varargin{:});
 opt = p.Results;
-%
 
-%%
-
+%% Stuff
 cleaners = {};
 warningState = warning('off','backtrace');
-cleaners{end+1} = onCleanup(@() warning(warningState));
+cleaners{end+1} = onCleanup(@() warning(warningState)); %#ok<NASGU>
 
-%%
-Y = zeros(sizeX);
-
-n = size(X,dim);
-
-sDim.type = '()';
-sNotDim.type = '()';
-subs = cell(1,ndims(X)); % Initialise subs
+%% Create @fun
 
 if nargout > 1
+    % 
     P = zeros([o+1 notDimSizeX]);
 end
 if nargout > 2
@@ -81,6 +61,8 @@ if nargout > 3
 end
 
 iiDisplayStep = fix(numel(X)./10); % Step to display ~ 20 notifications
+
+Y = fdim(X,fun,dim);
 
 for ii = 1:numel(X) % For each element of X
     [subs{:}] = ind2sub(sizeX,ii); % Convert linear index to subscripts
