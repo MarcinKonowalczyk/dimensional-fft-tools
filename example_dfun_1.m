@@ -8,13 +8,22 @@ fprintf('The result of dfun is correct: %i\n',isequal(NIR_std_1,NIR_std_2));
 fprintf('dfun is ~%.1f times slower than in-build std() function\n',t_dfun./t_base);
 %}
 %% Functionality showcase
-xBkg = [36 97 199 329]; % x for background correction
-NIR = dfun(NIR,@(y) y - polyval(polyfit(xBkg,y(xBkg),2),1:length(y)),2,[],'plot',true);
+
+% Correct the background based on 4 points. Plot the fit of the background
+% for each slice.
+xBkg = [36 99 199 329]; % x for background correction
+
+dim = 2;
+fun = @(y) y - polyval(polyfit(xBkg,y(xBkg),3),1:length(y));
+plotfun = @(y) polyval(polyfit(xBkg,y(xBkg),3),1:length(y));
+
+NIR = dfun(NIR,fun,dim,[],'plot','slice+plotfun','plotfun',plotfun);
+
 dNIR = dfun(NIR,@(x) x - NIR(1,:),2); % Difference spectrum
 rmsNIR = dfun(dNIR,@(x) sqrt(mean(x.^2)),1);
 
 %% Plot
-figure(1);
+figure;
 subplot(2,2,1); contourf(NIR,'edgecolor','none'); grid on; title('NIR');
 subplot(2,2,2); contourf(dNIR,'edgecolor','none'); grid on; title('\deltaNIR');
 

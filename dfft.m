@@ -10,7 +10,7 @@ narginchk(2,Inf);
 nargoutchk(0,2);
 
 X_size = size(X);
-if isequal(X_size,[1 1]);
+if isequal(X_size,[1 1])
     if nargout <2
         varargout = {X};
     else % nargout == 2
@@ -19,7 +19,7 @@ if isequal(X_size,[1 1]);
     return;
 end
 
-if nargin < 4 || isempty(dim);
+if nargin < 4 || isempty(dim)
     % Find first nonsingleton dimention of X
     dim = find(X_size ~= 1,1);
 end

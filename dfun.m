@@ -28,13 +28,20 @@ function Y = dfun(X,fun,dim,funargs,varargin)
 % OPTIONS
 %  Options are given as name-value pairs into varargin.
 %   'verbosity' - Flag which controls the output of the function to the
-%   (false)        console. This can be useful when the @fun is expected to
+%   (false)       console. This can be useful when the @fun is expected to
 %                 take a long time, or X is large.
 %   'plot'      - Controls plotting of the slices though X in the for loop.
-%   ('none')      Use only when necessary - e.g. for debugging your @fun.
-%                 The allowed values can be found below in the secion
+%   (false)       Use only when necessary - e.g. for debugging your @fun.
+%                 The allowed values can be found below in the section
 %                 PLOTTING.
-%   'plotfun'   - For use with some modes of plotting. See PLOTTING.
+%   'plotfun'   - An additional funciton handle to use with some plotting
+%   ([])          modes (see PLOTTING below)
+%   'plotpause' - Delay (in secconds) between individual slice plots when
+%   (0)           using the `plot` mode.
+%   'plotfargs' - Equivalent of the `funargs` input, but for use with the
+%   (funargs)     @plotfun. The default value is the same as funargs. You
+%                 can set it to `{}` fo the @plotfun to recieve no
+%                 additonal arguments.
 %   'advinput'  - Controls the nature of input into @fun. If this option is
 %   (false)       set to 'true', the input into @fun changes to
 %                 `fun(sliceThoughX,S,funargs{:})`, where `S` is a structure
@@ -44,7 +51,24 @@ function Y = dfun(X,fun,dim,funargs,varargin)
 %                 to the @fun required by the function.
 %
 % PLOTTING
-%  The allowed
+%  dfun allows one to plot the slices though X as slicing takes place. This
+%  is a tool for debugging your @fun and getting a better idea of the
+%  nature of your data, rather than for `everyday` use. The avalibe
+%  plotting modes are:
+%   'none'          - Dont plot anything.
+%   'slice'         - Plot each slice.
+%   true / false    - Translated to 'slice' and 'none' respectivelly.
+%   ''              - Translated to 'none'.
+%   'fun'           - Plot the @fun only.
+%   'plotfun'       - Plot the additional @plotfun only.
+%   'slice+fun'     - Plot each slice and @fun overlayed on the same graph
+%   'slice+plotfun' - Plot each slice and @plotfun overlayed on the same graph
+% 
+%  The delay between the plots can be controlled with the 'plotpause'
+%  option. The 'plotfun' is not evaluated if it is not needed for plotting.
+%  If 'advinput' is true, @plotfun also recieves an additional input
+%  argument.
+%
 % EXAMPLE 1 - Near IR spectra (2D matrix) presentation using function handles
 %  load spectra % loads matlab sample data
 %  xBkg = [36 97 199 329]; % x for background correction
@@ -102,32 +126,50 @@ elseif ~isa(funargs,'cell')
 end
 
 %% Parse the options
-validFlag = @(x) islogical(x) && isequal(size(x),[1 1]); % Is a valid T/F flag
-validPlotNames = {'', 'none', 'slice', 'fun', 'plotfun', 'slice+fun', 'slice+plotfun'};
-validPlot = @(x) any(cellfun(@(y) strcmp(x,y),validPlotNames));
-validFun = @(x) isa(x,'function_handle') || isempty(x);
+% Validators
+valid.bool = @(x) islogical(x) && isequal(size(x),[1 1]); % Is a valid T/F flag
+valid.num = @(x) isnumeric(x) && isequal(size(x),[1 1]);
+valid.plotNames = {'', 'none', 'slice', 'fun', 'plotfun', 'slice+fun', 'slice+plotfun'};
+valid.plot = @(x) any(cellfun(@(y) strcmp(x,y),valid.plotNames)) || valid.bool(x);
+valid.fun = @(x) isa(x,'function_handle') || isempty(x);
+
+% Input parser
 p = inputParser;
 p.KeepUnmatched = true;
-addOptional(p,'verbosity',false,validFlag);
-addOptional(p,'plot','none',validPlot);
-addOptional(p,'plotfun',[],validFun);
-addOptional(p,'advinput',false,validFlag);
+addOptional(p,'verbosity',false,valid.bool);
+addOptional(p,'plot','none',valid.plot);
+addOptional(p,'plotfun',[],valid.fun);
+addOptional(p,'plotfargs',funargs,@iscell);
+addOptional(p,'plotpause',0,valid.num);
+addOptional(p,'advinput',false,valid.bool);
 % WIP: option to time the execution of the @funs ?? (<- not sure if necessary)
 parse(p,varargin{:});
-opt = p.Results;
+opt = p.Results; % Container for user-supplied options
+flag = struct; % Container for inferred options
+
+clear varargin
 
 %% Process plot options
-if isempty(opt.plot), opt.plot = 'none'; end % Coersce empty opt.plot to 'none'
+if isempty(opt.plot), opt.plot = 'none'; end % Coerce empty opt.plot to 'none'
+% Coersce T/F plot options to `slice` and `none` respectively
+if valid.bool(opt.plot)
+    if opt.plot
+        opt.plot = 'slice';
+    else
+        opt.plot = 'none';
+    end
+end
 flag.plot = ~strcmp(opt.plot,'none'); % Whether to plot
 
-% Figure out whether meningful @plotfun exists
+% Figure out whether meaningful @plotfun exists
 % WIP: I think the code below can be written in a neater way
 flag.plotfun = flag.plot && ~isempty(opt.plotfun); % Plot and @plotfun supplied
-nargoutPlotFun = nargout(opt.plotfun);
 if flag.plotfun % Check whether plotfun is needed by opt.plot
     flag.plotfun = any(cellfun(@(y) strcmp(opt.plot,y),{'plotfun','slice+plotfun'}));
     if ~flag.plotfun && opt.verbosity, warning(msgID,'@plotfun is supplied but unused'); end
 end
+
+clear valid p
 
 %% Stuff
 cleaners = {};
@@ -137,7 +179,7 @@ cleaners{end+1} = onCleanup(@() warning(warningState)); % Return warnings to pre
 teapot = MException('dfun:Error418','I''m a teapot'); % Idiot error. This should never happen.
 
 %% Create internal @fun (and @plotfun if needed)
-% Coersce nargoutFun
+% Coerce nargoutFun
 if nargoutFun == -1
     % @fun is probably a function handle. These will always give only one output.
     % It's also possible @fun's only output is 'varargout'. Therefore issue a warning about that.
@@ -161,12 +203,12 @@ end
 
 if flag.plotfun
     % Coersce nargoutPlotFun (analogous to above)
-    switch nargoutPlotFun
+    switch nargout(opt.plotfun)
         case -1
-            nargoutPlotFun = 1;
+            %nargoutPlotFun = 1;
             if opt.verbosity; warning(msgID,'Assuming that @plotfun has only one output argument'); end
         case -2
-            nargoutPlotFun = 1; % Number of arguments out minus varargout
+            %nargoutPlotFun = 1; % Number of arguments out minus varargout
             if opt.verbosity; warning(msgID,'Ignoring `varargout` in the output of the @plotfun. This may cause errors.'); end
         otherwise
             % Abort plot since plotting with invalid @plotfun requested
@@ -176,15 +218,15 @@ if flag.plotfun
     
     % Define @plotfun for internal use
     if opt.advinput
-        plotfun = @(x,S) feval(opt.plotfun,x,S,funargs{:});
+        plotfun = @(x,S) feval(opt.plotfun,x,S,opt.plotfargs{:});
     else
-        plotfun = @(x) feval(opt.plotfun,x,funargs{:});
+        plotfun = @(x) feval(opt.plotfun,x,opt.plotfargs{:});
     end
 end
 
 %% Determine the nature of the output of @fun (and @plotfun if needed)
 if nargoutFun > 1
-    opt.mode = 'cell';
+    flag.mode = 'cell';
 else
     % Apply @fun to a dummy slice
     subs = cell(1,ndims(X)); % Initialise subs
@@ -201,72 +243,33 @@ else
     end
     
     % Determine the output mode
-    % WIP: Add support for the output to be larger than a vector in the matrix mode (has to add dimensions to Y)
-    if isnumeric(sDO) % Numeric output
-        if isequal(size(sDO),[1 1])
-            opt.mode = 'numeric-one';
-        elseif isvector(sDO)
-            opt.mode = 'numeric-vector';
-        else
-            opt.mode = 'cell';
-        end
-    elseif islogical(sDO) % Logical output
-        if isequal(size(sDO),[1 1])
-            opt.mode = 'logical-one';
-        elseif isvector(sDO)
-            opt.mode = 'logical-vector';
-        else
-            opt.mode = 'cell';
-        end
+    flag.mode = slice2mode(sDO);
+end
+
+if flag.plotfun % @plotfun has only one output and is needed
+    % Apply @plotfun to a dummy slice
+    if opt.advinput
+        sDO2 = plotfun(sliceDummy,subs);
     else
-        opt.mode = 'cell';
+        sDO2 = plotfun(sliceDummy);
+    end
+    
+    % Determine the plot mode
+    flag.plotmode = slice2mode(sDO2);
+    npc = strcmp(flag.plotmode,'cell'); % No Plot Condition
+    npc = npc || isempty(sDO2);
+    % Check for cases where the plot would contain just one point
+    npc = npc || strcmp(opt.plot,'fun') && any(cellfun(@(y) strcmp(flag.mode,y),{'number-one', 'logical-one'}));
+    npc = npc || strcmp(opt.plot,'plotfun') && any(cellfun(@(y) strcmp(flag.plotmode,y),{'number-one', 'logical-one'}));
+    
+    if npc
+        if opt.verbosity, warning(msgID,'@plotfun supplied has invalid output. No plot will be shown.'); end
+        flag.plot = false; flag.plotfun = flase;
     end
 end
 
-if flag.plotfun
-    if nargoutPlotFun > 1
-        opt.mode = 'cell';
-    else
-        % Apply @fun to a dummy slice
-        subs = cell(1,ndims(X)); % Initialise subs
-        [subs{:}] = ind2sub(sizeX,randi([1 numel(X)])); % Take a random point in X
-        subs{dim} = ':'; % Make it a slice in the correct dimension
-        sDummy.type = '()'; sDummy.subs = subs; % Create the subscript struct
-        % Dummy output of @fun; sampleDummyOutput
-        sliceDummy = subsref(X,sDummy); sliceDummy = sliceDummy(:)';
-        if opt.advinput
-            subs{dim} = []; subs = cell2mat(subs);
-            sDO = fun(sliceDummy,subs);
-        else
-            sDO = fun(sliceDummy);
-        end
-        
-        % Determine the output mode
-        % WIP: Add support for the output to be larger than a vector in the matrix mode (has to add dimensions to Y)
-        if isnumeric(sDO) % Numeric output
-            if isequal(size(sDO),[1 1])
-                opt.mode = 'numeric-one';
-            elseif isvector(sDO)
-                opt.mode = 'numeric-vector';
-            else
-                opt.mode = 'cell';
-            end
-        elseif islogical(sDO) % Logical output
-            if isequal(size(sDO),[1 1])
-                opt.mode = 'logical-one';
-            elseif isvector(sDO)
-                opt.mode = 'logical-vector';
-            else
-                opt.mode = 'cell';
-            end
-        else
-            opt.mode = 'cell';
-        end
-    end
-end
-
-%% Initialise the output variable according to the opt.mode
-switch opt.mode
+%% Initialise the output variable according to the flag.mode
+switch flag.mode
     case {'numeric-one', 'numeric-vector'}
         % Y is a matrix where the dimension specified by `dim` has the outputs of @fun
         sizeY = sizeX; sizeY(dim) = length(sDO);
@@ -282,6 +285,8 @@ switch opt.mode
     otherwise
         throw(teapot);
 end
+
+clear sDO sDO2 sizeY
 
 %% Loop though each element of X
 sliceDoneDim = 1:length(sizeX); sliceDoneDim(dim) = []; % Dimensions to index sliceDone
@@ -302,7 +307,11 @@ sSliceDone.type = '()';
 subs = cell(1,ndims(X));
 
 % Open a new figure if needed
-if flag.plot, fh = figure; end
+if flag.plot
+    fh = figure;
+    % Name the figure if running MATLAB R2014b or later
+    if ~verLessThan('matlab','8.4'), fh.Name = 'dfun plot'; end
+end
 
 % Prepare for verbose output
 if opt.verbosity
@@ -340,8 +349,17 @@ for xi = 1:numel(X)
         [sliceOutput{:}] = fun(slice); % Evaluate the @fun on slice
     end
     
+    slicePlotOutput = [];
+    if flag.plotfun
+        if opt.advinput
+            slicePlotOutput = plotfun(slice,sSliceX); % Evaluate the @fun on slice
+        else
+            slicePlotOutput = plotfun(slice); % Evaluate the @fun on slice
+        end
+    end
+    
     % Prepare to slice into Y
-    switch opt.mode
+    switch flag.mode
         % WIP: test test test
         case {'numeric-one', 'logical-one'}
             sliceOutput = sliceOutput{1}; % Only one output
@@ -362,21 +380,48 @@ for xi = 1:numel(X)
     sliceDone = subsasgn(sliceDone,sSliceDone,true);
     
     % Plot
-    if flag.plot, dfun_plot(fh,slice,sliceOutput,opt,sSliceX); end
+    if flag.plot, plotSlice(fh,slice,sliceOutput,slicePlotOutput,opt,flag,sSliceX); end
 end
 end
 
-function dfun_plot(fh,slice,sliceOutput,opt,sSliceX)
-%%
-%
+function mode = slice2mode(y)
+%% mode = slice2mode(y)
+% Converts a (dummy) slice to the appropriate `mode` string
+% WIP: Add support for the output to be larger than a vector in the matrix mode (has to add dimensions to Y)
 
-if strcomp(opt.mode,'cell') || strcomp(opt.mode,'null')
-    % Idiot error. This function should not be called if Y is a cell
-    teapot = MException('dfun:Error418','I''m a teapot');
-    throw(teapot);
+if isnumeric(y) % Numeric output
+    if isequal(size(y),[1 1])
+        mode = 'numeric-one';
+    elseif isvector(y)
+        mode = 'numeric-vector';
+    else
+        mode = 'cell';
+    end
+elseif islogical(y) % Logical output
+    if isequal(size(y),[1 1])
+        mode = 'logical-one';
+    elseif isvector(y)
+        mode = 'logical-vector';
+    else
+        mode = 'cell';
+    end
+else
+    mode = 'cell';
 end
+end
+
+function plotSlice(fh,slice,sliceOutput,slicePlotOutput,opt,flag,sSliceX)
+%% dfun_plot(fh,slice,sliceOutput,opt,flag,sSliceX)
+% Plot the slice to the figure specified by fh
 
 n = length(slice);
+teapot = MException('dfun:Error418','I''m a teapot');
+
+%% Colors
+colors.slice = [.1 .1 .1];
+colors.true  = [.1 .9 .1];
+colors.false = [.9 .1 .1];
+colors.fun   = [.1 .1 .9];
 
 %% Convert subs to a string
 subs = sSliceX.subs;
@@ -386,25 +431,82 @@ end
 subs = ['[' strjoin(subs,' ') ']'];
 
 %% Switch for different plot modes
+figure(fh);
+
 switch opt.plot
-    case 'numeric-vector'
-        figure(fh);
-        subplot(3,1,1);
-        plot(1:n,slice);
+    case 'slice'
+        X = 1:length(slice);
+        plot(X,slice,'color',colors.slice);
         title(sprintf('%s slice through X',subs));
-        grid on;
-        
-        subplot(3,1,2);
-        plot(1:n,sliceOutput);
-        title('@fun of the slice');
-        grid on;
-        
-        subplot(3,1,3);
-        plot(1:n,slice,1:n,sliceOutput);
-        title('both');
-        grid on;
-        
-        drawnow; pause(0.01);
+    case {'fun', 'plotfun'} % Case for both @fun and @plotfun only
+        if strcmp(opt.plot,'fun')
+            Y = sliceOutput; X = 1:length(sliceOutput);
+            mode = flag.mode;
+            name = '@fun';
+        else
+            Y = slicePlotOutput; X = 1:length(slicePlotOutput);
+            mode = flag.plotmode;
+            name = '@plotfun';
+        end
+        switch mode
+            case 'logical-vector'
+                tempY = double(plot(1:n,Y));
+                % Plot the `true` and 'false' part separatelly
+                plot(X(Y),tempY(Y),'.','color',colors.true); hold on;
+                plot(X(~Y),tempY(~Y),'.','color',colors.false); hold off;
+                ylim([-0.5 1.5]); % Set Y limit to see the T/F vector well
+                set(gca,'YTick',[0 1],'YTickLabel',{'T' 'F'});
+            case 'numeric-vector'
+                plot(X,Y,'color',colors.fun);
+            otherwise
+                throw(teapot);
+        end
+        title(sprintf('%s of the %s''th slice through X',name,subs));
+    case {'slice+fun', 'slice+plotfun'}
+        X = 1:length(slice);
+        p1 = plot(X,slice,'color',colors.slice); hold on;
+        if strcmp(opt.plot,'slice+fun')
+            Y = sliceOutput;
+            mode = flag.mode;
+            name = '@fun';
+        else
+            Y = slicePlotOutput;
+            mode = flag.plotmode;
+            name = '@plotfun';
+        end
+        switch mode
+            case 'numeric-one'
+                plot([min(X) max(X)],[Y Y],'--','color',colors.fun);
+            case 'numeric-vector'
+                X = 1:length(Y);
+                plot(X,Y,'color',colors.fun);
+            case 'logical-one'
+                if Y
+                    set(p1,'color',colors.true);
+                else
+                    set(p1,'color',colors.false);
+                end
+            case 'logical-vector'
+                if length(slice) == length(Y)
+                    % The function to plot is a logical of the same length as the slice
+                    plot(X(Y),slice(Y),'o','color',colors.true);
+                    plot(X(~Y),slice(~Y),'o','color',colors.false);
+                else
+                    % Scale Y to be visible
+                    tempY = double(Y); tempY = tempY .* std(slice) + mean(slice);
+                    X = 1:length(Y);
+                    plot(X(Y),tempY(Y),'.','color',colors.true);
+                    plot(X(~Y),tempY(~Y),'.','color',colors.false);
+                end                
+            otherwise
+                throw(teapot);
+        end
+        hold off;
+        title(sprintf('%s slice through X + %s',subs,name));
+        legend('slice',name);
     otherwise
+        throw(teapot);
 end
+grid on; xlim([1 n]); set(gca,'XTickLabel','');
+drawnow; pause(opt.plotpause);
 end
