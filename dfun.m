@@ -73,21 +73,23 @@ function Y = dfun(X,fun,dim,funargs,varargin)
 narginchk(2,Inf); % X and @fun are required
 nargoutchk(0,1);
 
-assert(~isa(X,'cell'),'dfun:InvalidInput','`X` musn''t be a cell array');
+msgID = 'dfun:InvalidInput'; % InvalidInput message ID
+
+assert(~isa(X,'cell'),msgID,'`X` musn''t be a cell array');
 if isempty(X) || isempty(fun); Y = X; return; end % Return Y = X if X or @fun are empty
 sizeX = size(X);
 
-assert(isa(fun,'function_handle'),'MATLAB:dfun:InvalidInput','@fun must be a function handle, not %s',class(fun));
-nargoutFun = nargout(fun);
-assert(nargoutFun ~= 0,'dfun:InvalidInput','@fun must be a function which provides outputs');
+assert(isa(fun,'function_handle'),msgID,'@fun must be a function handle, not %s',class(fun));
+nargoutFun = nargout(fun); % Number of outputs of the original @fun
+assert(nargoutFun ~= 0,msgID,'@fun must be a function which provides outputs');
 
 % Default of 'dim': Find first non-singleton dimension of X
 if nargin < 3 || isempty(dim)
     dim = find(sizeX ~= 1,1);
 else
-    assert(isnumeric(dim),'dfun:InvalidInput','`dim` must be numeric, not a %s',class(dim));
-    assert(isequal(size(dim),[1 1]),'dfun:InvalidInput','`dim` must be a single number, not %s',mat2str(size(dim)));
-    assert(dim >= 1,'dfun:InvalidInput','`dim` must be > 1. A value of %d  was supplied.',dim);
+    assert(isnumeric(dim),msgID,'`dim` must be numeric, not a %s',class(dim));
+    assert(isequal(size(dim),[1 1]),msgID,'`dim` must be a single number, not %s',mat2str(size(dim)));
+    assert(dim >= 1,msgID,'`dim` must be > 1. A value of %d  was supplied.',dim);
 end
 
 % Default of 'funargs': No additional @fun arguments
@@ -103,17 +105,29 @@ end
 validFlag = @(x) islogical(x) && isequal(size(x),[1 1]); % Is a valid T/F flag
 validPlotNames = {'', 'none', 'slice', 'fun', 'plotfun', 'slice+fun', 'slice+plotfun'};
 validPlot = @(x) any(cellfun(@(y) strcmp(x,y),validPlotNames));
-validFun = @(x) isa(x,'function_handle');
+validFun = @(x) isa(x,'function_handle') || isempty(x);
 p = inputParser;
 p.KeepUnmatched = true;
 addOptional(p,'verbosity',false,validFlag);
 addOptional(p,'plot','none',validPlot);
-addOptional(p,'plotfun',@(x) [],validFun);
+addOptional(p,'plotfun',[],validFun);
 addOptional(p,'advinput',false,validFlag);
 % WIP: option to time the execution of the @funs ?? (<- not sure if necessary)
 parse(p,varargin{:});
 opt = p.Results;
-if isempty(opt.plot), opt.plot = 'none'; end % Coersce opt.plot to 'none' 
+
+%% Process plot options
+if isempty(opt.plot), opt.plot = 'none'; end % Coersce empty opt.plot to 'none'
+flag.plot = ~strcmp(opt.plot,'none'); % Whether to plot
+
+% Figure out whether meningful @plotfun exists
+% WIP: I think the code below can be written in a neater way
+flag.plotfun = flag.plot && ~isempty(opt.plotfun); % Plot and @plotfun supplied
+nargoutPlotFun = nargout(opt.plotfun);
+if flag.plotfun % Check whether plotfun is needed by opt.plot
+    flag.plotfun = any(cellfun(@(y) strcmp(opt.plot,y),{'plotfun','slice+plotfun'}));
+    if ~flag.plotfun && opt.verbosity, warning(msgID,'@plotfun is supplied but unused'); end
+end
 
 %% Stuff
 cleaners = {};
@@ -122,32 +136,53 @@ cleaners{end+1} = onCleanup(@() warning(warningState)); % Return warnings to pre
 
 teapot = MException('dfun:Error418','I''m a teapot'); % Idiot error. This should never happen.
 
-%% Create internal fun
-% Number of outputs of the original @fun
+%% Create internal @fun (and @plotfun if needed)
+% Coersce nargoutFun
 if nargoutFun == -1
     % @fun is probably a function handle. These will always give only one output.
     % It's also possible @fun's only output is 'varargout'. Therefore issue a warning about that.
     nargoutFun = 1;
-    if opt.verbosity; warning('dfun:InvalidInput','Assuming that @fun has only one output argument'); end
+    if opt.verbosity; warning(msgID,'Assuming that @fun has only one output argument'); end
 elseif nargoutFun < -1
     % @fun has 'varargout'
     % Number of arguments out minus varargout
     nargoutFun = abs(nargoutFun + 1);
-    if opt.verbosity; warning('dfun:InvalidInput','Ignoring `varargout` in the output of the @fun'); end
+    if opt.verbosity; warning(msgID,'Ignoring `varargout` in the output of the @fun. This may cause errors.'); end
 elseif nargoutFun == 0
     throw(teapot);
 end
 
-stringFun = func2str(fun);
-if ~strcmp(stringFun(1),'@'), stringFun = ['@' stringFun]; end % Make sure stringfun starts with `@`
-
+% Redefine @fun for internal use
 if opt.advinput
     fun = @(x,S) feval(fun,x,S,funargs{:});
 else
     fun = @(x) feval(fun,x,funargs{:});
 end
 
-%% Determine the nature of the output of @fun
+if flag.plotfun
+    % Coersce nargoutPlotFun (analogous to above)
+    switch nargoutPlotFun
+        case -1
+            nargoutPlotFun = 1;
+            if opt.verbosity; warning(msgID,'Assuming that @plotfun has only one output argument'); end
+        case -2
+            nargoutPlotFun = 1; % Number of arguments out minus varargout
+            if opt.verbosity; warning(msgID,'Ignoring `varargout` in the output of the @plotfun. This may cause errors.'); end
+        otherwise
+            % Abort plot since plotting with invalid @plotfun requested
+            flag.plotfun = false; flag.plot = false;
+            if ~flag.plotfun && opt.verbosity, warning(msgID,'@plotfun supplied must have exactly one oputput. No plot will be shown.'); end
+    end
+    
+    % Define @plotfun for internal use
+    if opt.advinput
+        plotfun = @(x,S) feval(opt.plotfun,x,S,funargs{:});
+    else
+        plotfun = @(x) feval(opt.plotfun,x,funargs{:});
+    end
+end
+
+%% Determine the nature of the output of @fun (and @plotfun if needed)
 if nargoutFun > 1
     opt.mode = 'cell';
 else
@@ -188,6 +223,48 @@ else
     end
 end
 
+if flag.plotfun
+    if nargoutPlotFun > 1
+        opt.mode = 'cell';
+    else
+        % Apply @fun to a dummy slice
+        subs = cell(1,ndims(X)); % Initialise subs
+        [subs{:}] = ind2sub(sizeX,randi([1 numel(X)])); % Take a random point in X
+        subs{dim} = ':'; % Make it a slice in the correct dimension
+        sDummy.type = '()'; sDummy.subs = subs; % Create the subscript struct
+        % Dummy output of @fun; sampleDummyOutput
+        sliceDummy = subsref(X,sDummy); sliceDummy = sliceDummy(:)';
+        if opt.advinput
+            subs{dim} = []; subs = cell2mat(subs);
+            sDO = fun(sliceDummy,subs);
+        else
+            sDO = fun(sliceDummy);
+        end
+        
+        % Determine the output mode
+        % WIP: Add support for the output to be larger than a vector in the matrix mode (has to add dimensions to Y)
+        if isnumeric(sDO) % Numeric output
+            if isequal(size(sDO),[1 1])
+                opt.mode = 'numeric-one';
+            elseif isvector(sDO)
+                opt.mode = 'numeric-vector';
+            else
+                opt.mode = 'cell';
+            end
+        elseif islogical(sDO) % Logical output
+            if isequal(size(sDO),[1 1])
+                opt.mode = 'logical-one';
+            elseif isvector(sDO)
+                opt.mode = 'logical-vector';
+            else
+                opt.mode = 'cell';
+            end
+        else
+            opt.mode = 'cell';
+        end
+    end
+end
+
 %% Initialise the output variable according to the opt.mode
 switch opt.mode
     case {'numeric-one', 'numeric-vector'}
@@ -217,24 +294,28 @@ else
     sliceDone = false(1,sliceDoneSize); % Special case for 1D sliceDone
 end
 
+% Prepare slicers
 sSliceX.type = '()';
 sSliceDone.type = '()';
 
-subs = cell(1,ndims(X)); % Initialise subs
+% Initialise subs
+subs = cell(1,ndims(X));
 
-iiDisplayStep = fix(numel(X)./100); % Step to display ~ 20 notifications
+% Open a new figure if needed
+if flag.plot, fh = figure; end
 
-% Open a new figure if plotting
-if opt.plot
-    fh = figure;
+% Prepare for verbose output
+if opt.verbosity
+    iiDisplayStep = fix(numel(X)./100); % Step to display ~ 20 notifications
+    stringFun = func2str(fun);
+    if ~strcmp(stringFun(1),'@'), stringFun = ['@' stringFun]; end % Make sure stringfun starts with `@`
+    fprintf('fdim running with @fun = %.30s: 000%%',stringFun); % Limit the function name to be only 30 characters long
+    cleaners{end+1} = onCleanup(@() fprintf('\n')); %#ok<NASGU> % Print a new line character when out of scope
 end
-
-if opt.verbosity, fprintf('fdim running with @fun = %.30s: 000%%',stringFun); end % Limit the function name to be only 30 characters long
-if opt.verbosity, cleaners{end+1} = onCleanup(@() fprintf('\n')); end %#ok<NASGU> % Print a new line character when out of scope
 
 for xi = 1:numel(X)
     % Display % done message
-    if ~mod(xi,iiDisplayStep) && opt.verbosity, fprintf('\b\b\b\b%03.f%%',xi./numel(X).*100), end
+    if opt.verbosity && ~mod(xi,iiDisplayStep), fprintf('\b\b\b\b%03.f%%',xi./numel(X).*100), end
     
     % Get the index of the xi'th element of X
     [subs{:}] = ind2sub(sizeX,xi); % Convert linear index to subscripts
@@ -281,7 +362,7 @@ for xi = 1:numel(X)
     sliceDone = subsasgn(sliceDone,sSliceDone,true);
     
     % Plot
-    if opt.plot && ~strcmp(opt.mode,'cell'), dfun_plot(fh,slice,sliceOutput,opt,sSliceX); end
+    if flag.plot, dfun_plot(fh,slice,sliceOutput,opt,sSliceX); end
 end
 end
 

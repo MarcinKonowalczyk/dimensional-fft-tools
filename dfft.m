@@ -57,7 +57,7 @@ if iseven
     f = linspace(0,0.5,len)./dt;
 else
     len = ceil(n/2);
-    f = linspace(0,0.5 - 1/n, len)./dt;
+    f = linspace(0,0.5 - 1/(2*n), len)./dt;
 end
 
 S.subs{dim} = 1:len;
