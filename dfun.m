@@ -477,9 +477,11 @@ switch opt.plot
         switch mode
             case 'numeric-one'
                 plot([min(X) max(X)],[Y Y],'--','color',colors.fun);
+                legend('slice',name);
             case 'numeric-vector'
                 X = 1:length(Y);
                 plot(X,Y,'color',colors.fun);
+                legend('slice',name);
             case 'logical-one'
                 if Y
                     set(p1,'color',colors.true);
@@ -497,13 +499,13 @@ switch opt.plot
                     X = 1:length(Y);
                     plot(X(Y),tempY(Y),'.','color',colors.true);
                     plot(X(~Y),tempY(~Y),'.','color',colors.false);
-                end                
+                end
+                legend('slice',name);
             otherwise
                 throw(teapot);
         end
         hold off;
         title(sprintf('%s slice through X + %s',subs,name));
-        legend('slice',name);
     otherwise
         throw(teapot);
 end

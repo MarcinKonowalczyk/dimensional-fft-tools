@@ -16,6 +16,8 @@ xBkg = [36 99 199 329]; % x for background correction
 dim = 2;
 fun = @(y) y - polyval(polyfit(xBkg,y(xBkg),3),1:length(y));
 plotfun = @(y) polyval(polyfit(xBkg,y(xBkg),3),1:length(y));
+%plotfun = @(y) y > polyval(polyfit(xBkg,y(xBkg),3),1:length(y));
+%plotfun = @(y) y > 0;
 
 NIR = dfun(NIR,fun,dim,[],'plot','slice+plotfun','plotfun',plotfun);
 
