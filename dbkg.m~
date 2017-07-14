@@ -1,5 +1,5 @@
 function [varargout] = dbkg(X,o,dim,varargin)
-%% [Y,dY,P,S,Mu] = dbkg(X,o,dim,...)
+%% [Y,P,S,Mu] = dbkg(X,o,dim,...)
 % This function fits (& subtracts) the n'th order polynomial background function
 % from the data along the 'dim' dimention
 %
@@ -13,7 +13,7 @@ function [varargout] = dbkg(X,o,dim,varargin)
 
 %% Parse input
 narginchk(1,Inf);
-nargoutchk(0,5);
+nargoutchk(0,4);
 
 sizeX = size(X);
 notDim = 1:length(sizeX); notDim(dim) = [];
@@ -128,24 +128,25 @@ end
 
 end
 
-function y = subBkg1(s,o,opt)
-sI = 1:length(s); % Slice indices
-[p,s,mu] = polyfit(sI,s,o);
-[fit,~] = polyval(p,sI,s,mu); % <- WIP: delta fit
-% Subtract background
+function y = subBkg1(slice,o,opt)
+
+sliceI = 1:length(slice); % Slice indices
+
+[p,s,mu] = polyfit(sliceI,slice,o);
+[fit,~] = polyval(p,sliceI,s,mu); % <- WIP: delta fit
+
 y = subBkgByOpt(x,fit,opt.output);
 end
 
-function [y,p,s,mu] = subBkgN(s,o,opt)
-sI = 1:length(s); % Slice indices
-[p,s,mu] = polyfit(sI,s,o);
+function y = subBkgN(x,o,opt)
+% WIP
 [fit,~] = polyval(p,1:n,s,mu);
-% Subtract background
-y = subBkgByOpt(s,fit,opt.output);
+y = subBkgByOpt(x,fit,opt.output);
 end
 
 function y = subBkgByOpt(x,fit,output)
-% Subtract fit from data by using opt.output
+% Substitute fit from data by using opt.output
+% Subtract(/divide/fit) background
 switch output
     case 'subtract'
         y = x - fit;
@@ -153,9 +154,5 @@ switch output
         y = x./fit - 1;
     case 'fit'
         y = fit;
-    otherwise
-        % Idiot error. This should never happen.
-        teapot = MException('dfun:Error418','I''m a teapot');
-        throwAsCaller(teapot);
 end
 end

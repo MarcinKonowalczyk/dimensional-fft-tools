@@ -73,21 +73,21 @@ function Y = dfun(X,fun,dim,funargs,varargin)
 narginchk(2,Inf); % X and @fun are required
 nargoutchk(0,1);
 
-assert(~isa(X,'cell'),'dfun:InvalidInput','`X` musn''t be a cell array');
+assert(~isa(X,'cell'),'dfun:invalidInput','`X` musn''t be a cell array');
 if isempty(X) || isempty(fun); Y = X; return; end % Return Y = X if X or @fun are empty
 sizeX = size(X);
 
-assert(isa(fun,'function_handle'),'MATLAB:dfun:InvalidInput','@fun must be a function handle, not %s',class(fun));
+assert(isa(fun,'function_handle'),'MATLAB:dfun:invalidInput','@fun must be a function handle, not %s',class(fun));
 nargoutFun = nargout(fun);
-assert(nargoutFun ~= 0,'dfun:InvalidInput','@fun must be a function which provides outputs');
+assert(nargoutFun ~= 0,'dfun:invalidInput','@fun must be a function which provides outputs');
 
 % Default of 'dim': Find first non-singleton dimension of X
 if nargin < 3 || isempty(dim)
     dim = find(sizeX ~= 1,1);
 else
-    assert(isnumeric(dim),'dfun:InvalidInput','`dim` must be numeric, not a %s',class(dim));
-    assert(isequal(size(dim),[1 1]),'dfun:InvalidInput','`dim` must be a single number, not %s',mat2str(size(dim)));
-    assert(dim >= 1,'dfun:InvalidInput','`dim` must be > 1. A value of %d  was supplied.',dim);
+    assert(isnumeric(dim),'dfun:invalidInput','`dim` must be numeric, not a %s',class(dim));
+    assert(isequal(size(dim),[1 1]),'dfun:invalidInput','`dim` must be a single number, not %s',mat2str(size(dim)));
+    assert(dim >= 1,'dfun:invalidInput','`dim` must be > 1. A value of %d  was supplied.',dim);
 end
 
 % Default of 'funargs': No additional @fun arguments
@@ -113,7 +113,7 @@ addOptional(p,'advinput',false,validFlag);
 % WIP: option to time the execution of the @funs ?? (<- not sure if necessary)
 parse(p,varargin{:});
 opt = p.Results;
-if isempty(opt.plot), opt.plot = 'none'; end % Coersce opt.plot to 'none' 
+if isempty p.plot)
 
 %% Stuff
 cleaners = {};
@@ -128,12 +128,12 @@ if nargoutFun == -1
     % @fun is probably a function handle. These will always give only one output.
     % It's also possible @fun's only output is 'varargout'. Therefore issue a warning about that.
     nargoutFun = 1;
-    if opt.verbosity; warning('dfun:InvalidInput','Assuming that @fun has only one output argument'); end
+    if opt.verbosity; warning('dfun:invalidInput','Assuming that @fun has only one output argument'); end
 elseif nargoutFun < -1
     % @fun has 'varargout'
     % Number of arguments out minus varargout
     nargoutFun = abs(nargoutFun + 1);
-    if opt.verbosity; warning('dfun:InvalidInput','Ignoring `varargout` in the output of the @fun'); end
+    if opt.verbosity; warning('dfun:invalidInput','Ignoring `varargout` in the output of the @fun'); end
 elseif nargoutFun == 0
     throw(teapot);
 end
@@ -289,7 +289,7 @@ function dfun_plot(fh,slice,sliceOutput,opt,sSliceX)
 %%
 %
 
-if strcomp(opt.mode,'cell') || strcomp(opt.mode,'null')
+if strcomp(opt.mode,'cell') || strcomp(opt.mode,'null
     % Idiot error. This function should not be called if Y is a cell
     teapot = MException('dfun:Error418','I''m a teapot');
     throw(teapot);
