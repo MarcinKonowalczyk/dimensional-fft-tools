@@ -15,7 +15,8 @@ The issue they then run into is that their data is a 4D array of absorbance valu
 This adds up to quite a heavy operation which, furthermore, needs to be nested in 4 `for`-loops indexing though all the dimensions. This toolbox aims to help with exactly these kind of tasks.
 
 ### ToDo's
- - Go through all the WIP and put them into this list
+ - Go through all the WIP notes and put them into this list
  - Add more toolbox description to this doc
  - Figure out how to avoid using sliceDone matrix. this should improve the performance (<- Major restructuring needed)
  - Add more examples to `dfun` documentation
+ - Test `dfun` plotting for different modes and `@plotfuns`
