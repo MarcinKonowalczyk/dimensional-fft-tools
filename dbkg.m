@@ -14,7 +14,8 @@ function [varargout] = dbkg(X,o,dim,varargin)
 %% Parse input
 narginchk(1,Inf);
 nargoutchk(0,5);
-
+%{
+WIP
 sizeX = size(X);
 notDim = 1:length(sizeX); notDim(dim) = [];
 notDimSizeX = sizeX; notDimSizeX(dim) = [];
@@ -34,11 +35,14 @@ if nargin < 2 || isempty(o)
     % Default to a 0'th order polynomial
     o = 0;
 end
+%}
+
+valid.output = @(x) any(cellfun(@(y) strcmp(x,y),{'subtract', 'fit'}));
 
 p = inputParser;
 p.KeepUnmatched = true;
-addOptional(p,'output','subtract');
-addOptional(p,'plot',0);
+addOptional(p,'output','subtract',valid.output);
+addOptional(p,'plot',false);
 parse(p,varargin{:});
 opt = p.Results;
 
@@ -128,34 +132,52 @@ end
 
 end
 
-function y = subBkg1(s,o,opt)
-sI = 1:length(s); % Slice indices
-[p,s,mu] = polyfit(sI,s,o);
-[fit,~] = polyval(p,sI,s,mu); % <- WIP: delta fit
-% Subtract background
-y = subBkgByOpt(x,fit,opt.output);
-end
+function [y,dy,p,s,mu] = SubBkgN(s,o,output)
+%% [y,dy,p,s,mu] = SubBkgN(s,o,output)
+% Subtract polynomial background
+% All the outputs
 
-function [y,p,s,mu] = subBkgN(s,o,opt)
-sI = 1:length(s); % Slice indices
-[p,s,mu] = polyfit(sI,s,o);
-[fit,~] = polyval(p,1:n,s,mu);
-% Subtract background
-y = subBkgByOpt(s,fit,opt.output);
-end
+n = length(s); % Number of opits in the slice
+sI = 1:n; % Slice indices
 
-function y = subBkgByOpt(x,fit,output)
-% Subtract fit from data by using opt.output
+if o >= n, o = n-1; end % Cant fit a polynomial of order >= n of points
+
+[p,s,mu] = polyfit(sI,s,o); % Fir n'th order
+[fit,dfit] = polyval(p,1:n,s,mu);
+
 switch output
     case 'subtract'
         y = x - fit;
+        dy = dfit;
     case 'divide'
         y = x./fit - 1;
+        dy = dfit; % WIP
     case 'fit'
         y = fit;
+        dy = dfit;
     otherwise
         % Idiot error. This should never happen.
         teapot = MException('dfun:Error418','I''m a teapot');
         throwAsCaller(teapot);
 end
+end
+
+function y = SubBkg1(s,o,output)
+% Subtract polynomial background (1 output)
+[y,~,~,~,~] = SubBkgN(s,o,output);
+end
+
+function [y,dy] = SubBkg2(s,o,output)
+% Subtract polynomial background (2 outputs)
+[y,dy,~,~,~] = SubBkgN(s,o,output);
+end
+
+function [y,dy,p] = SubBkg3(s,o,output)
+% Subtract polynomial background (3 outputs)
+[y,dy,p,~,~] = SubBkgN(s,o,output);
+end
+
+function [y,dy,p,s] = SubBkg4(s,o,output)
+% Subtract polynomial background (4 outputs)
+[y,dy,p,s,~] = SubBkgN(s,o,output);
 end
