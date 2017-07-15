@@ -145,8 +145,6 @@ addOptional(p,'advinput',false,valid.bool);
 % WIP: option to time the execution of the @funs ?? (<- not sure if necessary)
 parse(p,varargin{:});
 opt = p.Results; % Container for user-supplied options
-flag = struct; % Container for inferred options
-
 clear varargin
 
 %% Process plot options
@@ -159,14 +157,14 @@ if valid.bool(opt.plot)
         opt.plot = 'none';
     end
 end
-flag.plot = ~strcmp(opt.plot,'none'); % Whether to plot
+opt.flagPlot = ~strcmp(opt.plot,'none'); % Whether to plot
 
 % Figure out whether meaningful @plotfun exists
 % WIP: I think the code below can be written in a neater way
-flag.plotfun = flag.plot && ~isempty(opt.plotfun); % Plot and @plotfun supplied
-if flag.plotfun % Check whether plotfun is needed by opt.plot
-    flag.plotfun = any(cellfun(@(y) strcmp(opt.plot,y),{'plotfun','slice+plotfun'}));
-    if ~flag.plotfun && opt.verbosity, warning(msgID,'@plotfun is supplied but unused'); end
+opt.flagPlotFun = opt.flagPlot && ~isempty(opt.plotfun); % Plot and @plotfun supplied
+if opt.flagPlotFun % Check whether plotfun is needed by opt.plot
+    opt.flagPlotFun = any(cellfun(@(y) strcmp(opt.plot,y),{'plotfun','slice+plotfun'}));
+    if ~opt.flagPlotFun && opt.verbosity, warning(msgID,'@plotfun is supplied but unused'); end
 end
 
 clear valid p
@@ -201,7 +199,7 @@ else
     fun = @(x) feval(fun,x,funargs{:});
 end
 
-if flag.plotfun
+if opt.flagPlotFun
     % Coersce nargoutPlotFun (analogous to above)
     switch nargout(opt.plotfun)
         case -1
@@ -212,8 +210,8 @@ if flag.plotfun
             if opt.verbosity; warning(msgID,'Ignoring `varargout` in the output of the @plotfun. This may cause errors.'); end
         otherwise
             % Abort plot since plotting with invalid @plotfun requested
-            flag.plotfun = false; flag.plot = false;
-            if ~flag.plotfun && opt.verbosity, warning(msgID,'@plotfun supplied must have exactly one oputput. No plot will be shown.'); end
+            opt.flagPlotFun = false; opt.flagPlot = false;
+            if ~opt.flagPlotFun && opt.verbosity, warning(msgID,'@plotfun supplied must have exactly one oputput. No plot will be shown.'); end
     end
     
     % Define @plotfun for internal use
@@ -226,7 +224,7 @@ end
 
 %% Determine the nature of the output of @fun (and @plotfun if needed)
 if nargoutFun > 1
-    flag.mode = 'cell';
+    opt.mode = 'cell';
 else
     % Apply @fun to a dummy slice
     subs = cell(1,ndims(X)); % Initialise subs
@@ -243,10 +241,10 @@ else
     end
     
     % Determine the output mode
-    flag.mode = slice2mode(sDO);
+    opt.mode = slice2mode(sDO);
 end
 
-if flag.plotfun % @plotfun has only one output and is needed
+if opt.flagPlotFun % @plotfun has only one output and is needed
     % Apply @plotfun to a dummy slice
     if opt.advinput
         sDO2 = plotfun(sliceDummy,subs);
@@ -255,21 +253,21 @@ if flag.plotfun % @plotfun has only one output and is needed
     end
     
     % Determine the plot mode
-    flag.plotmode = slice2mode(sDO2);
-    npc = strcmp(flag.plotmode,'cell'); % No Plot Condition
+    opt.flagPlotmode = slice2mode(sDO2);
+    npc = strcmp(opt.flagPlotmode,'cell'); % No Plot Condition
     npc = npc || isempty(sDO2);
     % Check for cases where the plot would contain just one point
-    npc = npc || strcmp(opt.plot,'fun') && any(cellfun(@(y) strcmp(flag.mode,y),{'number-one', 'logical-one'}));
-    npc = npc || strcmp(opt.plot,'plotfun') && any(cellfun(@(y) strcmp(flag.plotmode,y),{'number-one', 'logical-one'}));
+    npc = npc || strcmp(opt.plot,'fun') && any(cellfun(@(y) strcmp(opt.mode,y),{'number-one', 'logical-one'}));
+    npc = npc || strcmp(opt.plot,'plotfun') && any(cellfun(@(y) strcmp(opt.flagPlotmode,y),{'number-one', 'logical-one'}));
     
     if npc
         if opt.verbosity, warning(msgID,'@plotfun supplied has invalid output. No plot will be shown.'); end
-        flag.plot = false; flag.plotfun = flase;
+        opt.flagPlot = false; opt.flagPlotFun = flase;
     end
 end
 
-%% Initialise the output variable according to the flag.mode
-switch flag.mode
+%% Initialise the output variable according to the opt.mode
+switch opt.mode
     case {'numeric-one', 'numeric-vector'}
         % Y is a matrix where the dimension specified by `dim` has the outputs of @fun
         sizeY = sizeX; sizeY(dim) = length(sDO);
@@ -288,7 +286,7 @@ end
 
 clear sDO sDO2 sizeY
 
-%% Loop though each element of X
+%% Bits and bobs
 sliceDoneDim = 1:length(sizeX); sliceDoneDim(dim) = []; % Dimensions to index sliceDone
 sliceDoneSize = sizeX; sliceDoneSize(dim) = []; % Dimensions of sliceDone
 
@@ -307,7 +305,7 @@ sSliceDone.type = '()';
 subs = cell(1,ndims(X));
 
 % Open a new figure if needed
-if flag.plot
+if opt.flagPlot
     fh = figure;
     % Name the figure if running MATLAB R2014b or later
     if ~verLessThan('matlab','8.4'), fh.Name = 'dfun plot'; end
@@ -322,6 +320,7 @@ if opt.verbosity
     cleaners{end+1} = onCleanup(@() fprintf('\n')); %#ok<NASGU> % Print a new line character when out of scope
 end
 
+%% Loop though each element of X
 for xi = 1:numel(X)
     % Display % done message
     if opt.verbosity && ~mod(xi,iiDisplayStep), fprintf('\b\b\b\b%03.f%%',xi./numel(X).*100), end
@@ -350,7 +349,7 @@ for xi = 1:numel(X)
     end
     
     slicePlotOutput = [];
-    if flag.plotfun
+    if opt.flagPlotFun
         if opt.advinput
             slicePlotOutput = plotfun(slice,sSliceX); % Evaluate the @fun on slice
         else
@@ -359,7 +358,7 @@ for xi = 1:numel(X)
     end
     
     % Prepare to slice into Y
-    switch flag.mode
+    switch opt.mode
         % WIP: test test test
         case {'numeric-one', 'logical-one'}
             sliceOutput = sliceOutput{1}; % Only one output
@@ -380,7 +379,7 @@ for xi = 1:numel(X)
     sliceDone = subsasgn(sliceDone,sSliceDone,true);
     
     % Plot
-    if flag.plot, plotSlice(fh,slice,sliceOutput,slicePlotOutput,opt,flag,sSliceX); end
+    if opt.flagPlot, plotSlice(fh,slice,sliceOutput,slicePlotOutput,opt,flag,sSliceX); end
 end
 end
 
@@ -441,11 +440,11 @@ switch opt.plot
     case {'fun', 'plotfun'} % Case for both @fun and @plotfun only
         if strcmp(opt.plot,'fun')
             Y = sliceOutput; X = 1:length(sliceOutput);
-            mode = flag.mode;
+            mode = opt.mode;
             name = '@fun';
         else
             Y = slicePlotOutput; X = 1:length(slicePlotOutput);
-            mode = flag.plotmode;
+            mode = opt.flagPlotmode;
             name = '@plotfun';
         end
         switch mode
@@ -467,11 +466,11 @@ switch opt.plot
         p1 = plot(X,slice,'color',colors.slice); hold on;
         if strcmp(opt.plot,'slice+fun')
             Y = sliceOutput;
-            mode = flag.mode;
+            mode = opt.mode;
             name = '@fun';
         else
             Y = slicePlotOutput;
-            mode = flag.plotmode;
+            mode = opt.flagPlotmode;
             name = '@plotfun';
         end
         switch mode
