@@ -114,6 +114,7 @@ else
     assert(isnumeric(dim),msgID,'`dim` must be numeric, not a %s',class(dim));
     assert(isequal(size(dim),[1 1]),msgID,'`dim` must be a single number, not %s',mat2str(size(dim)));
     assert(dim >= 1,msgID,'`dim` supplied (%d) must be >= 1',dim);
+    assert(dim == fix(dim),'`dim` supplied(%d) mist be an integer',dim);
     assert(dim <= length(sizeX),msgID,'`dim` supplied (%d) cannot be larger than number of dimentions of X (%d)',dim,length(sizeX));
 end
 

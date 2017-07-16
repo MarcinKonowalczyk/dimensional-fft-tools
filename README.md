@@ -20,3 +20,5 @@ This adds up to quite a heavy operation which, furthermore, needs to be nested i
  - Figure out how to avoid using sliceDone matrix. this should improve the performance (<- Major restructuring needed)
  - Add more examples to `dfun` documentation
  - Test `dfun` plotting for different modes and `@plotfuns`
+ - Add `@fun` output size > vector to `dfun` for numeric and logical outputs
+ - Make sure that if `@fun` output is a string, `dfun` works correctly
