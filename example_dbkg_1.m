@@ -2,7 +2,10 @@ close all; clear; clc;
 
 load('test-data.mat');
 
-Y0 = dbkg(A,2,2);
+[Y0,dy] = dbkg(A,2,2);
+
+keyboard % <- WIP
+
 Y1 = dbkg(A,10,2);
 Y2 = dbkg(A,25,2);
 

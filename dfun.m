@@ -113,7 +113,8 @@ if nargin < 3 || isempty(dim)
 else
     assert(isnumeric(dim),msgID,'`dim` must be numeric, not a %s',class(dim));
     assert(isequal(size(dim),[1 1]),msgID,'`dim` must be a single number, not %s',mat2str(size(dim)));
-    assert(dim >= 1,msgID,'`dim` must be > 1. A value of %d  was supplied.',dim);
+    assert(dim >= 1,msgID,'`dim` supplied (%d) must be >= 1',dim);
+    assert(dim <= length(sizeX),msgID,'`dim` supplied (%d) cannot be larger than number of dimentions of X (%d)',dim,length(sizeX));
 end
 
 % Default of 'funargs': No additional @fun arguments
@@ -361,19 +362,19 @@ for xi = 1:numel(X)
     switch opt.mode
         % WIP: test test test
         case {'numeric-one', 'logical-one'}
-            sliceOutput = sliceOutput{1}; % Only one output
+            sliceOutput = sliceOutput(1); % Only one output
             sSliceY.type = '()'; sSliceY.subs = subs; sSliceY.subs{dim} = 1; % Create the subscript struct
         case {'numeric-vector', 'logical-vector'}
-            sliceOutput = sliceOutput{1}; % Only one output
+            sliceOutput = sliceOutput(1); % Only one output
             sSliceY.type = '()'; sSliceY.subs = subs; sSliceY.subs{dim} = ':'; % Create the subscript struct
         case 'cell'
-            sSliceY.type = '{}'; sSliceY.subs = subs; sSliceY.subs{dim} = nargoutFun; % Create the subscript struct
+            sSliceY.type = '{}'; sSliceY.subs = subs; sSliceY.subs{dim} = ':'; % Create the subscript struct
         otherwise
             throw(teapot);
     end
     
     % Slice the outputs into Y
-    Y = subsasgn(Y,sSliceY,sliceOutput);
+    Y = subsasgn(Y,sSliceY,sliceOutput{:});
     
     % Mark slice as done
     sliceDone = subsasgn(sliceDone,sSliceDone,true);

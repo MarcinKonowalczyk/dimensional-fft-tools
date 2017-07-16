@@ -14,28 +14,30 @@ function [varargout] = dbkg(X,o,dim,varargin)
 %% Parse input
 narginchk(1,Inf);
 nargoutchk(0,5);
-%{
-WIP
+
+msgID = 'dbkg:InvalidInput'; % InvalidInput message ID
+
+assert(isnumeric(X),msgID,'`X` must be a numeric array');
 sizeX = size(X);
-notDim = 1:length(sizeX); notDim(dim) = [];
-notDimSizeX = sizeX; notDimSizeX(dim) = [];
 
-if length(notDimSizeX) > 1
-    sliceDone = false(notDimSizeX);
-else
-    sliceDone = false(1,notDimSizeX);
-end
-
+% Default of 'dim': Find first non-singleton dimension of X
 if nargin < 3 || isempty(dim)
-    % Find first nonsingleton dimention of X
     dim = find(sizeX ~= 1,1);
+else
+    assert(isnumeric(dim),msgID,'`dim` must be numeric, not a %s',class(dim));
+    assert(isequal(size(dim),[1 1]),msgID,'`dim` must be a single number, not %s',mat2str(size(dim)));
+    assert(dim >= 1,msgID,'`dim` must be > 1. A value of %d  was supplied.',dim);
+    assert(dim <= length(sizeX),msgID,'`dim` supplied (%d) cannot be larger than number of dimentions of X (%d)',dim,length(sizeX));
 end
 
-if nargin < 2 || isempty(o)
-    % Default to a 0'th order polynomial
+% Default of 'o': 0'th order polynomial - mean of the slice
+if nargin < 2 || isempty(0)
     o = 0;
+else
+    assert(isnumeric(o),msgID,'`o` must be numeric, not a %s',class(o));
+    assert(isequal(size(o),[1 1]),msgID,'`o` must be a single number, not %s',mat2str(size(o)));
+    assert(o >= 0,msgID,'`o` must be >= 0. A value of %d was supplied.',o);
 end
-%}
 
 valid.output = @(x) any(cellfun(@(y) strcmp(x,y),{'subtract', 'fit'}));
 
@@ -51,66 +53,45 @@ cleaners = {};
 warningState = warning('off','backtrace');
 cleaners{end+1} = onCleanup(@() warning(warningState)); %#ok<NASGU>
 
-%% Create @fun
-
-if nargout > 1
-    %
-    P = zeros([o+1 notDimSizeX]);
+%% Select @fun
+% The form of these is [y,dy,p,s,mu] = SubBkgN(s,o,output);
+switch nargout % Switch between functions with different N of outputs
+    case 1
+        fun = @SubBkg1;
+    case 2
+        fun = @SubBkg2;
+    case 3
+        fun = @SubBkg3;
+    case 4
+        fun = @SubBkg4;
+    case 5
+        fun = @SubBkgN;
+    otherwise
+        throw(teapot);
 end
-if nargout > 2
-    S = cell(notDimSizeX);
+
+% Process plot options
+if opt.plot
+    opt.plot = 'slice+plotfun';
+    plotfun = @(x,o,~) SubBkg1(x,o,'fit'); % Use the `fit` output as the @plotfun
+else
+    opt.plot = 'none';
+    plotfun = [];
 end
-if nargout > 3
-    Mu = zeros([2 notDimSizeX]);
-end
 
-iiDisplayStep = fix(numel(X)./10); % Step to display ~ 20 notifications
+%% Apply dfun and process the outputs
+Y = dfun(X,fun,dim,{o,opt.output},'plot',opt.plot,'plotfun',plotfun);
 
-Y = fdim(X,fun,dim);
+keyboard % <- WIP
 
-for ii = 1:numel(X) % For each element of X
-    [subs{:}] = ind2sub(sizeX,ii); % Convert linear index to subscripts
-    sNotDim.subs = subs(notDim);
-    
-    if ~mod(ii,iiDisplayStep), fprintf('%3.3f %% done\n',ii./numel(X).*100), end
-    if subsref(sliceDone,sNotDim), continue, end
-    
-    subs{dim} = ':';
-    sDim.subs = subs;
-    
-    slice = subsref(X,sDim);
-    slice = slice(:)';
-    
-    [p,s,mu] = polyfit(1:n,slice,o);
-    
-    if nargout > 1 % Polynomial fit coeffs
-        sForP.type = '()';
-        sForP.subs = {':' , subs{notDim}};
-        P = subsasgn(P,sForP,p);
-    end
-    if nargout > 2 % Error estimates structure
-        sForS.type = '{}';
-        sForS.subs = subs(notDim);
-        S = subsasgn(S,sForS,s);
-    end
-    if nargout > 3 %
-        sForMu.type = '()';
-        sForMu.subs = {':' , subs{notDim}};
-        Mu = subsasgn(Mu,sForMu,mu);
-    end
-    
-    % Plot of the fit
-    if opt.plot > 1
-        figure(1);
-        plot(1:n,slice,'.',1:n,fit,'-');
-        grid on; drawnow; pause(0.01);
-    end
-    
-    % Assign into Y
-    Y = subsasgn(Y,sDim,slice);
-    
-    % Mark slice as done
-    sliceDone = subsasgn(sliceDone,sNotDim,true);
+switch nargout
+    case 1
+    case 2
+    case 3
+    case 4
+    case 5
+    otherwise
+        throw(teapot);
 end
 
 varargout = {Y};
@@ -132,17 +113,16 @@ end
 
 end
 
-function [y,dy,p,s,mu] = SubBkgN(s,o,output)
+function [y,dy,p,s,mu] = SubBkgN(x,o,output)
 %% [y,dy,p,s,mu] = SubBkgN(s,o,output)
-% Subtract polynomial background
-% All the outputs
+% Subtract polynomial background (All the outputs)
 
-n = length(s); % Number of opits in the slice
+n = length(x); % Number of opits in the slice
 sI = 1:n; % Slice indices
 
 if o >= n, o = n-1; end % Cant fit a polynomial of order >= n of points
 
-[p,s,mu] = polyfit(sI,s,o); % Fir n'th order
+[p,s,mu] = polyfit(sI,x,o); % Fit n'th order
 [fit,dfit] = polyval(p,1:n,s,mu);
 
 switch output
