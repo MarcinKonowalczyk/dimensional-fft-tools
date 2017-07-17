@@ -22,3 +22,4 @@ This adds up to quite a heavy operation which, furthermore, needs to be nested i
  - Test `dfun` plotting for different modes and `@plotfuns`
  - Add `@fun` output size > vector to `dfun` for numeric and logical outputs
  - Make sure that if `@fun` output is a string, `dfun` works correctly
+ - Allow fof `dfun` & `partcell` to operate on subsets of the dimentions; e.g. 2:5 of length(10) dimention. ?? (Not sure if needed/useful)
