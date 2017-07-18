@@ -40,12 +40,14 @@ else
     assert(o >= 0,msgID,'`o` must be >= 0. A value of %d was supplied.',o);
 end
 
-valid.output = @(x) any(cellfun(@(y) strcmp(x,y),{'subtract', 'fit'}));
+valid.output = @(x) any(cellfun(@(y) strcmp(x,y),{'subtract', 'fit', 'divide'}));
+valid.num = @(x) isnumeric(x) && isequal(size(x),[1 1]);
 
 p = inputParser;
 p.KeepUnmatched = true;
 addOptional(p,'output','subtract',valid.output);
 addOptional(p,'plot',false);
+addOptional(p,'plotpause',0,valid.num);
 parse(p,varargin{:});
 opt = p.Results;
 
@@ -53,6 +55,8 @@ opt = p.Results;
 cleaners = {};
 warningState = warning('off','backtrace');
 cleaners{end+1} = onCleanup(@() warning(warningState)); %#ok<NASGU>
+
+teapot = MException('dbkg:Error418','I''m a teapot'); % Idiot error. This should never happen.
 
 %% Select @fun
 % The form of these is [y,dy,p,s,mu] = SubBkgN(s,o,output);
@@ -66,7 +70,7 @@ switch nargout % Switch between functions with different N of outputs
     case 4
         fun = @SubBkg4;
     case 5
-        fun = @SubBkgN;
+        fun = @SubBkg5;
     otherwise
         throw(teapot);
 end
@@ -80,41 +84,29 @@ else
     plotfun = [];
 end
 
-%% Apply dfun and process the outputs
-Y = dfun(X,fun,dim,{o,opt.output},'plot',opt.plot,'plotfun',plotfun);
+if ~strcomp(opt.plot,'none'), opt.figure = figure; end
 
-keyboard % <- WIP
+%% Apply dfun and process the outputs
+F = dfun(X,fun,dim,{o,opt},'plot',opt.plot,'plotfun',plotfun,'advinput',true);
+
+if nargout >= 2, dY = cell2mat(F(:,2)); end
+if nargout >= 3,  P = cell2mat(F(:,3)); end
+if nargout >= 4,  S = F(:,4);           end
+if nargout >= 5, Mu = cell2mat(F(:,5)); end
+if nargout >  1,  Y = cell2mat(F(:,1)); end % If nargout == 1, F=F;
 
 switch nargout
-    case 1
-    case 2
-    case 3
-    case 4
-    case 5
+    case 1, varargout = {Y};
+    case 2, varargout = {Y,dY};
+    case 3, varargout = {Y,dY,P};
+    case 4, varargout = {Y,dY,P,S};
+    case 5, varargout = {Y,dY,P,S,Mu};
     otherwise
         throw(teapot);
 end
-
-varargout = {Y};
-if nargout > 1
-    order = [dim 1:dim-1 dim+1:length(size(X))]; % Permute dimention of interest to beginning
-    iOrder = [2:dim 1 dim+1:order(end)]; % Inverse permute
-    sOrder = [1:dim-1 length(size(X)) dim:length(size(X))-1];
-    P = permute(P,iOrder);
-    varargout{end+1} = P;
-end
-if nargout > 2
-    S = permute(S,sOrder);
-    varargout{end+1} = S;
-end
-if nargout > 3
-    Mu = permute(Mu,iOrder);
-    varargout{end+1} = Mu;
 end
 
-end
-
-function [y,dy,p,s,mu] = SubBkgN(x,o,output)
+function [y,dy,p,s,mu] = SubBkg5(x,S,o,opt)
 %% [y,dy,p,s,mu] = SubBkgN(s,o,output)
 % Subtract polynomial background (All the outputs)
 
@@ -124,41 +116,57 @@ sI = 1:n; % Slice indices
 if o >= n, o = n-1; end % Cant fit a polynomial of order >= n of points
 
 [p,s,mu] = polyfit(sI,x,o); % Fit n'th order
-[fit,dfit] = polyval(p,1:n,s,mu);
+[y,dy] = polyval(p,1:n,s,mu);
 
-switch output
+%% Move plotfun to dfun
+if opt.plot
+    % Convert subs to a string
+    subs = S.subs;
+    for i = 1:length(subs)
+        if isnumeric(subs{i}), subs{i} = num2str(subs{i}); end
+    end
+    subs = ['[' strjoin(subs,' ') ']'];
+    
+    figure(opt.figure);
+    plot(sI,x,sI,y,sI,y+dy,'r--',sI,y-dy,'r--');
+    grid on;
+    xlim([1 n]); set(gca,'XTickLabel','');
+    title(sprintf('%s slice though X',subs));
+    drawnow;
+    pause(opt.plotpause);
+end
+
+switch opt.output
     case 'subtract'
-        y = x - fit;
-        dy = dfit;
+        y = x - y;
     case 'divide'
-        y = x./fit - 1;
-        dy = dfit; % WIP
+        y = x./y - 1;
+        dy = dy./y; % Output fractional error
     case 'fit'
-        y = fit;
-        dy = dfit;
+        % y = y;
     otherwise
-        % Idiot error. This should never happen.
-        teapot = MException('dfun:Error418','I''m a teapot');
+        teapot = MException('dbkg:Error418','I''m a teapot'); % Idiot error. This should never happen.
         throwAsCaller(teapot);
 end
+
 end
 
-function y = SubBkg1(s,o,output)
+function y = SubBkg1(x,S,o,opt)
 % Subtract polynomial background (1 output)
-[y,~,~,~,~] = SubBkgN(s,o,output);
+[y,~,~,~,~] = SubBkg5(x,S,o,opt);
 end
 
-function [y,dy] = SubBkg2(s,o,output)
+function [y,dy] = SubBkg2(x,S,o,opt)
 % Subtract polynomial background (2 outputs)
-[y,dy,~,~,~] = SubBkgN(s,o,output);
+[y,dy,~,~,~] = SubBkg5(x,S,o,opt);
 end
 
-function [y,dy,p] = SubBkg3(s,o,output)
+function [y,dy,p] = SubBkg3(x,S,o,opt)
 % Subtract polynomial background (3 outputs)
-[y,dy,p,~,~] = SubBkgN(s,o,output);
+[y,dy,p,~,~] = SubBkg5(x,S,o,opt);
 end
 
-function [y,dy,p,s] = SubBkg4(s,o,output)
+function [y,dy,p,s] = SubBkg4(x,S,o,opt)
 % Subtract polynomial background (4 outputs)
-[y,dy,p,s,~] = SubBkgN(s,o,output);
+[y,dy,p,s,~] = SubBkg5(x,S,o,opt);
 end

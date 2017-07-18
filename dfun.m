@@ -381,7 +381,7 @@ for xi = 1:numel(X)
     sliceDone = subsasgn(sliceDone,sSliceDone,true);
     
     % Plot
-    if opt.flagPlot, plotSlice(fh,slice,sliceOutput,slicePlotOutput,opt,flag,sSliceX); end
+    if opt.flagPlot, plotSlice(fh,slice,sliceOutput,slicePlotOutput,opt,sSliceX); end
 end
 end
 
@@ -411,8 +411,8 @@ else
 end
 end
 
-function plotSlice(fh,slice,sliceOutput,slicePlotOutput,opt,flag,sSliceX)
-%% dfun_plot(fh,slice,sliceOutput,opt,flag,sSliceX)
+function plotSlice(fh,slice,sliceOutput,slicePlotOutput,opt,sSliceX)
+%% dfun_plot(fh,slice,sliceOutput,opt,sSliceX)
 % Plot the slice to the figure specified by fh
 
 n = length(slice);
@@ -503,12 +503,12 @@ switch opt.plot
                 end
                 legend('slice',name);
             otherwise
-                throw(teapot);
+                throwAsCaller(teapot);
         end
         hold off;
         title(sprintf('%s slice through X + %s',subs,name));
     otherwise
-        throw(teapot);
+        throwAsCaller(teapot);
 end
 grid on; xlim([1 n]); set(gca,'XTickLabel','');
 drawnow; pause(opt.plotpause);

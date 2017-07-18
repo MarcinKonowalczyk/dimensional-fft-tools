@@ -1,13 +1,13 @@
 function [Y,D] = partcell(X,dim,varargin)
 %% [varargout] = partcell(X,dim)
 % This function goes though the cell X in the specified dimention, and
-% attempts to construct a numeric/logical output form each slice specified 
+% attempts to construct a numeric/logical output form each slice specified
 % by I along it. If I is [] then it goes though every slice.
 % WIP: This explanation is not very good looking...
 %
 % X   : {100,300,5,20};
 % dim : 3;
-% Y   : {5} where each elem is a size:[100 300 squeeze(n m ...) 20] where 
+% Y   : {5} where each elem is a size:[100 300 squeeze(n m ...) 20] where
 %       n,m,... are the dimentions of the element of X along dim
 % WIP: option `nosqueeze`
 
@@ -70,18 +70,18 @@ for Ii = 1:length(I) % For each of the slices along the specified dimention
     
     %keyboard
     slice = subsref(X,sX);
-    sizeSlice = size(slice);
+    sizeSliceX = size(slice);
     
     %% Check subset of elements for type and size consistency
     % Choose log10(<n of elements>) + <n of dimentions> indices without repetition
     ns = numel(slice);
-    randomI = randperm(ns,ceil(log10(ns))+length(sizeSlice));
+    randomI = randperm(ns,ceil(log10(ns))+length(sizeSliceX));
     
     classes = cell(1,numel(randomI));
     sizes = cell(1,numel(randomI));
     for is = 1:numel(randomI) % Loop though trial slice indices
-        subs = cell(1,length(sizeSlice)); % Initialise subs
-        [subs{:}] = ind2sub(sizeSlice,randomI(is)); % Convert linerar index to subscript
+        subs = cell(1,length(sizeSliceX)); % Initialise subs
+        [subs{:}] = ind2sub(sizeSliceX,randomI(is)); % Convert linerar index to subscript
         ris.type = '{}'; ris.subs = subs;
         trialSliceElement = subsref(slice,ris);
         classes{is} = class(trialSliceElement);
@@ -89,8 +89,6 @@ for Ii = 1:length(I) % For each of the slices along the specified dimention
     end
     classInconsistency = any(cellfun(@(x) ~isequal(x,classes{1}),classes));
     sizeInconsistency = any(cellfun(@(x) ~isequal(x,sizes{1}),sizes));
-    
-    keyboard
     
     % Skip to the next interation if inconsistent
     % WIP on adding 'force' options
@@ -101,7 +99,7 @@ for Ii = 1:length(I) % For each of the slices along the specified dimention
     else
         % Take the first element of the trial classes as the class of the whole slice
         if isempty(trialSliceElement)
-            Y{Ii} = trialSliceElement;
+            Y{Ii} = trialSliceElement; % Y{Ii} is empty of the same class as trialSliceElement
             continue
         elseif isnumeric(trialSliceElement)
             if isequal(size(trialSliceElement),[1 1])
@@ -132,24 +130,36 @@ for Ii = 1:length(I) % For each of the slices along the specified dimention
         continue % Skip slice
     else
         % Take the size of the first element of the trial as the size of each element in the slice
-        sizeSliceElement = sizes{1};
+        switch mode
+            case {'numeric-one', 'logical-one'}
+                sizeSliceElement = 1;
+            case {'numeric-vector', 'logical-vecotr'}
+                sizeSliceElement = length(trialSliceElement);
+            case {'numeric-matrix', 'logical-matrix'}
+                sizeSliceElement = size(squeeze(trialSliceElement));
+            otherwise
+                throw(teapot);
+        end
     end
     
     % Assumig that's handled...
     
     %% Initialise slice matrix
     
-    keyboard
+    sizeYElement = [sizeX(1:dim-1) sizeSliceElement sizeX(dim+1:end)];
+    
     switch mode
-        case 'numeric'
-        case 'logical'
-        otherwise
-            throw(teapot);
+        case {'numeric-one', 'numeric-vector', 'numeric-matrix'}
+            yElement = zeros(sizeYElement,'like',trialSliceElement);
+        case {'logical-one', 'logical-vector', 'logical-matrix'}
+            yElement = false(sizeYElement);
     end
     
+    keyboard
+    
     %% Convert slice to matrix
-    for is = 1:numel(slice)
-        [subs{:}] = ind2sub(sizeSlice,ri);
+    for is = 1:numel(eElement)
+        [subs{:}] = ind2sub(sizeSliceX,ri);
     end
     keyboard
 end
