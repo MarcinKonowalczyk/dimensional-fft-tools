@@ -74,29 +74,21 @@ switch nargout % Switch between functions with different N of outputs
     otherwise
         throw(teapot);
 end
+    
 
-% Process plot options
-if opt.plot
-    opt.plot = 'slice+plotfun';
-    plotfun = @(x,o,~) SubBkg1(x,o,'fit'); % Use the `fit` output as the @plotfun
-else
-    opt.plot = 'none';
-    plotfun = [];
-end
-
-if ~strcomp(opt.plot,'none'), opt.figure = figure; end
+if opt.plot, opt.figure = figure; end
 
 %% Apply dfun and process the outputs
-F = dfun(X,fun,dim,{o,opt},'plot',opt.plot,'plotfun',plotfun,'advinput',true);
+F = dfun(X,fun,dim,{o,opt},'advinput',true);
 
-if nargout >= 2, dY = cell2mat(F(:,2)); end
-if nargout >= 3,  P = cell2mat(F(:,3)); end
-if nargout >= 4,  S = F(:,4);           end
-if nargout >= 5, Mu = cell2mat(F(:,5)); end
-if nargout >  1,  Y = cell2mat(F(:,1)); end % If nargout == 1, F=F;
+if nargout >= 2, dY = cell2mat(F(:,2));   end
+if nargout >= 3,  P = cell2mat(F(:,3));   end
+if nargout >= 4,  S = F(:,4);             end
+if nargout >= 5, Mu = cell2mat(F(:,5)')'; end
+if nargout >  1,  Y = cell2mat(F(:,1));   end % If nargout == 1, F=F;
 
 switch nargout
-    case 1, varargout = {Y};
+    case 1, varargout = {F};
     case 2, varargout = {Y,dY};
     case 3, varargout = {Y,dY,P};
     case 4, varargout = {Y,dY,P,S};
@@ -118,7 +110,7 @@ if o >= n, o = n-1; end % Cant fit a polynomial of order >= n of points
 [p,s,mu] = polyfit(sI,x,o); % Fit n'th order
 [y,dy] = polyval(p,1:n,s,mu);
 
-%% Move plotfun to dfun
+% WIP: Move plotfun to dfun
 if opt.plot
     % Convert subs to a string
     subs = S.subs;
@@ -150,6 +142,7 @@ switch opt.output
 end
 
 end
+
 
 function y = SubBkg1(x,S,o,opt)
 % Subtract polynomial background (1 output)

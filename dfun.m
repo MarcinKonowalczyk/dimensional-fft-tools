@@ -236,8 +236,7 @@ else
     % Dummy output of @fun; sampleDummyOutput
     sliceDummy = subsref(X,sDummy); sliceDummy = sliceDummy(:)';
     if opt.advinput
-        subs{dim} = []; subs = cell2mat(subs);
-        sDO = fun(sliceDummy,subs);
+        sDO = fun(sliceDummy,sDummy);
     else
         sDO = fun(sliceDummy);
     end
@@ -249,7 +248,7 @@ end
 if opt.flagPlotFun % @plotfun has only one output and is needed
     % Apply @plotfun to a dummy slice
     if opt.advinput
-        sDO2 = plotfun(sliceDummy,subs);
+        sDO2 = plotfun(sliceDummy,sDummy);
     else
         sDO2 = plotfun(sliceDummy);
     end

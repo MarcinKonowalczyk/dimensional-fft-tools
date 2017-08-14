@@ -2,7 +2,7 @@ close all; clear; clc;
 
 load('test-data.mat');
 
-Y0 = dbkg(A,0,2);
+Y0 = dbkg(A,0,2,'plot',1);
 Y1 = dbkg(A,5,2);
 Y2 = dbkg(A,10,2);
 

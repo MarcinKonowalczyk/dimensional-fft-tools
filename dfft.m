@@ -1,36 +1,48 @@
 function [varargout] = dfft(t,X,n,dim,varargin)
 %% [f,Y] = dfft(t,X,n,dim,...)
-% This function takes the ... 
+% This function takes the array X and applies a fourier transform along
+% each 1D slice along the dimention specified by `dim`. It also calculates 
 %
 % SYNTAX
 % 
 
 %% Parse input
-narginchk(2,Inf);
-nargoutchk(0,2);
+narginchk(1,Inf);
+nargoutchk(0,5);
 
-X_size = size(X);
-if isequal(X_size,[1 1])
-    if nargout <2
-        varargout = {X};
-    else % nargout == 2
-        varargout = {X,NaN};
-    end
-    return;
-end
+msgID = 'dfft:InvalidInput'; % InvalidInput message ID
 
-if nargin < 4 || isempty(dim)
-    % Find first nonsingleton dimention of X
-    dim = find(X_size ~= 1,1);
-end
+% Process required arguments
+assert(isnumeric(X),msgID,'`X` must be a numeric array');
+sizeX = size(X);
 
-if nargin < 3 || isempty(n)
-    n = size(X,dim);
-end
+assert(isnumeric(t),msgID,'t must be numeric');
+assert(isvector(t),msgID,'t must be a vector');
+t = t(:); % Make sure t is a column vector
 
-t = t(:);
 dt = mean(diff(t));
 assert(dt>0,'dimensional-fft-tools:Invalid t','''t'' must be monotonically increasing vector');
+
+% Default of 'dim': Find first non-singleton dimension of X
+if nargin < 4 || isempty(dim)
+    dim = find(sizeX ~= 1,1);
+else
+    assert(isnumeric(dim),msgID,'`dim` must be numeric, not a %s',class(dim));
+    assert(isequal(size(dim),[1 1]),msgID,'`dim` must be a single number, not %s',mat2str(size(dim)));
+    assert(dim >= 1,msgID,'`dim` supplied (%d) must be >= 1',dim);
+    assert(dim == fix(dim),'`dim` supplied(%d) mist be an integer',dim);
+    assert(dim <= length(sizeX),msgID,'`dim` supplied (%d) cannot be larger than number of dimentions of X (%d)',dim,length(sizeX));
+end
+
+% Default of 'n': Length of X along dim
+if nargin < 3 || isempty(n)
+    n = sizeX(dim);
+else
+    assert(isnumeric(n),msgID,'`n` must be numeric, not a %s',class(n));
+    assert(isequal(size(n),[1 1]),msgID,'`n` must be a single number, not %s',mat2str(size(n)));
+    assert(n >= 1,msgID,'`n` supplied (%d) must be >= 1',n);
+    assert(n == fix(n),'`n` supplied(%d) mist be an integer',n);
+end
 
 p = inputParser;
 p.KeepUnmatched = true;
@@ -38,6 +50,16 @@ addOptional(p,'abs',true);
 addOptional(p,'trim',true);
 parse(p,varargin{:});
 opt = p.Results;
+
+%% Stuff
+cleaners = {};
+warningState = warning('off','backtrace');
+cleaners{end+1} = onCleanup(@() warning(warningState)); %#ok<NASGU>
+
+teapot = MException('dbkg:Error418','I''m a teapot'); % Idiot error. This should never happen.
+
+%% Seleft @fun
+
 
 %% FFT core
 Y = fft(X,n,dim);
