@@ -69,33 +69,29 @@ cleaners = {};
 warningState = warning('off','backtrace');
 cleaners{end+1} = onCleanup(@() warning(warningState)); %#ok<NASGU>
 
-teapot = MException('dbkg:Error418','I''m a teapot'); % Idiot error. This should never happen.
-
-keyboard
+teapot = MException('dwin:Error418','I''m a teapot'); % Idiot error. This should never happen.
 
 %% Select @fun
-% The form of these is [y,dy,p,s,mu] = SubBkgN(s,o,output);
-switch nargout % Switch between functions with different N of outputs
-    case 1
-        fun = @SubBkg1;
-    case 2
-        fun = @SubBkg2;
-    case 3
-        fun = @SubBkg3;
-    case 4
-        fun = @SubBkg4;
-    case 5
-        fun = @SubBkg5;
+% WIP: write own hann and hamm functions
+switch type
+    case 'hann'
+        fun = @(x) x.*hann(length(x))';
+    case 'hamm'
+        fun = @(x) x.*hamming(lenght(x))';
     otherwise
         throw(teapot);
 end
-    
 
-if opt.plot, opt.figure = figure; end
+if opt.plot
+    opt.plot = 'fun';
+else
+    opt.plot = 'none';
+end
 
 %% Apply dfun and process the outputs
-F = dfun(X,fun,dim,{type,opt},'advinput',true);
+F = dfun(X,fun,dim,[],'plot',opt.plot);
 
+keyboard
 if nargout >= 2, dY = cell2mat(F(:,2));   end
 if nargout >= 3,  P = cell2mat(F(:,3));   end
 if nargout >= 4,  S = F(:,4);             end

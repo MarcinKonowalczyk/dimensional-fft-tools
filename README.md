@@ -16,6 +16,7 @@ This adds up to quite a heavy operation which, furthermore, needs to be nested i
 
 ### ToDo's
  - Go through all the WIP notes and put them into this list
+ - Make the toolbox independant of `Window Designer` app by writing own window functions
  - Add more toolbox description to this doc
  - Figure out how to avoid using sliceDone matrix. this should improve the performance (<- Major restructuring needed)
  - Add more examples to `dfun` documentation

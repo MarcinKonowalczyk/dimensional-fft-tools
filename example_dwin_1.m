@@ -2,7 +2,8 @@ close all; clear; clc;
 
 load('test-data.mat');
 
-Y0 = dwin(A,false,2,'plot',true);
+A = dbkg(A,0,2);
+Y0 = dwin(A,'hann',2,'plot',true);
 
 return
 

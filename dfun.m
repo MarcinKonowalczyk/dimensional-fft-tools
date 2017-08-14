@@ -267,6 +267,13 @@ if opt.flagPlotFun % @plotfun has only one output and is needed
     end
 end
 
+%% Figure out whether still can plot the output as desired
+if opt.flagPlot && strcmp(opt.mode,'cell')
+    % WIP
+    opt.flagPlot = false;
+    if opt.verbosity, warning(msgID,'Unable to plot'); end
+end
+
 %% Initialise the output variable according to the opt.mode
 switch opt.mode
     case {'numeric-one', 'numeric-vector'}
@@ -362,10 +369,10 @@ for xi = 1:numel(X)
     switch opt.mode
         % WIP: test test test
         case {'numeric-one', 'logical-one'}
-            sliceOutput = sliceOutput(1); % Only one output
+            %sliceOutput = sliceOutput(1); % Only one output
             sSliceY.type = '()'; sSliceY.subs = subs; sSliceY.subs{dim} = 1; % Create the subscript struct
         case {'numeric-vector', 'logical-vector'}
-            sliceOutput = sliceOutput(1); % Only one output
+            %sliceOutput = sliceOutput(1); % Only one output
             sSliceY.type = '()'; sSliceY.subs = subs; sSliceY.subs{dim} = ':'; % Create the subscript struct
         case 'cell'
             sSliceY.type = '{}'; sSliceY.subs = subs; sSliceY.subs{dim} = ':'; % Create the subscript struct
@@ -412,6 +419,7 @@ end
 
 function plotSlice(fh,slice,sliceOutput,slicePlotOutput,opt,sSliceX)
 %% dfun_plot(fh,slice,sliceOutput,opt,sSliceX)
+% This should not be called if opt.mode is 'cell'
 % Plot the slice to the figure specified by fh
 
 n = length(slice);
@@ -438,13 +446,13 @@ switch opt.plot
         X = 1:length(slice);
         plot(X,slice,'color',colors.slice);
         title(sprintf('%s slice through X',subs));
-    case {'fun', 'plotfun'} % Case for both @fun and @plotfun only
+    case {'fun', 'plotfun'} % Case for both @fun and @plotfun
         if strcmp(opt.plot,'fun')
-            Y = sliceOutput; X = 1:length(sliceOutput);
+            Y = sliceOutput{1}; X = 1:length(sliceOutput{1});
             mode = opt.mode;
             name = '@fun';
         else
-            Y = slicePlotOutput; X = 1:length(slicePlotOutput);
+            Y = slicePlotOutput{1}; X = 1:length(slicePlotOutput{1});
             mode = opt.flagPlotmode;
             name = '@plotfun';
         end
@@ -466,11 +474,11 @@ switch opt.plot
         X = 1:length(slice);
         p1 = plot(X,slice,'color',colors.slice); hold on;
         if strcmp(opt.plot,'slice+fun')
-            Y = sliceOutput;
+            Y = sliceOutput{1};
             mode = opt.mode;
             name = '@fun';
         else
-            Y = slicePlotOutput;
+            Y = slicePlotOutput{1};
             mode = opt.flagPlotmode;
             name = '@plotfun';
         end
