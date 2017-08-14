@@ -23,3 +23,7 @@ This adds up to quite a heavy operation which, furthermore, needs to be nested i
  - Add `@fun` output size > vector to `dfun` for numeric and logical outputs
  - Make sure that if `@fun` output is a string, `dfun` works correctly
  - Allow fof `dfun` & `partcell` to operate on subsets of the dimentions; e.g. 2:5 of length(10) dimention. ?? (Not sure if needed/useful)
+
+ ### Style guide
+ * The functions should be written in such a way, as to reduce depndencies complexity. This means that all the functions should be kept to a small number of files (preferably all in one file). It also means not using MATLAB toolboxes unless necessarry. The reasoning behind this is to keep the toolbox easy to take apart and use in one's own ways.
+ * Lean on the generous side of comments. Bare in mind that this toolbox is aimed at academics who may not necessarilly be familliar with minutia of MATLAB

@@ -1,15 +1,19 @@
 function [varargout] = dbkg(X,o,dim,varargin)
 %% [Y,dY,P,S,Mu] = dbkg(X,o,dim,...)
-% This function fits (& subtracts) the n'th order polynomial background function
-% from the data along the 'dim' dimention
+% This function fits (& subtracts) the n'th order polynomial background
+% function from the data along the 'dim' dimention.
 %
 % SYNTAX
-%
+% ...
+% 
 % EXAMPLES
-%
+% ...
 %  for j = 1:16;
 %      A(:,:,j) = conv2(magic(64),magic(j),'same');
 %  end
+%
+% Written by Marcin Konowalczyk
+% Timmel Group @ Oxford University
 
 %% Parse input
 narginchk(1,Inf);
