@@ -36,7 +36,7 @@ end
 
 valid.output = @(x) any(cellfun(@(y) strcmp(x,y),{'subtract', 'fit', 'divide'}));
 valid.num = @(x) isnumeric(x) && isequal(size(x),[1 1]);
-valid.windowNames = {'', 'none', 'rect', 'hann', 'hamm'};
+valid.windowNames = {'', 'none', 'rect', 'trigle','welch','sine','hann', 'hamm'};
 valid.bool = @(x) islogical(x) && isequal(size(x),[1 1]); % Is a valid T/F flag
 valid.windowType = @(x) any(cellfun(@(y) strcmp(x,y),valid.windowNames)) || valid.bool(x);
 
@@ -72,12 +72,13 @@ cleaners{end+1} = onCleanup(@() warning(warningState)); %#ok<NASGU>
 teapot = MException('dwin:Error418','I''m a teapot'); % Idiot error. This should never happen.
 
 %% Select @fun
-% WIP: write own hann and hamm functions
+% WIP: add more windows
 switch type
-    case 'hann'
-        fun = @(x) x.*hann(length(x))';
-    case 'hamm'
-        fun = @(x) x.*hamming(lenght(x))';
+    case 'trigle', fun = @trigle;
+    case 'welch', fun = @welch;
+    case 'sine', fun = @sine;
+    case 'hann', fun = @hann;
+    case 'hamm', fun = @hamm;
     otherwise
         throw(teapot);
 end
@@ -88,23 +89,64 @@ else
     opt.plot = 'none';
 end
 
-%% Apply dfun and process the outputs
-F = dfun(X,fun,dim,[],'plot',opt.plot);
-
-keyboard
-if nargout >= 2, dY = cell2mat(F(:,2));   end
-if nargout >= 3,  P = cell2mat(F(:,3));   end
-if nargout >= 4,  S = F(:,4);             end
-if nargout >= 5, Mu = cell2mat(F(:,5)')'; end
-if nargout >  1,  Y = cell2mat(F(:,1));   end % If nargout == 1, F=F;
-
-switch nargout
-    case 1, varargout = {F};
-    case 2, varargout = {Y,dY};
-    case 3, varargout = {Y,dY,P};
-    case 4, varargout = {Y,dY,P,S};
-    case 5, varargout = {Y,dY,P,S,Mu};
-    otherwise
-        throw(teapot);
+%% Apply dfun
+Y = dfun(X,fun,dim,[],'plot',opt.plot);
 end
+
+function xw = trigle(x)
+% Triangular window
+N = length(x);
+n = 0:(N-1);
+alpha = (N-1)./2;
+w = 1-abs(n./alpha - 1);
+xw = x.*w;
+end
+
+function w = parzen(N)
+% Parzen window
+% WIP...
+n = 0:(N-1);
+w = zeros(1,N);
+for ni = 1:N
+    cn = n(ni);
+    if n < N/4
+    else
+    end
+end
+end
+
+function xw = welch(x)
+% Welch window
+N = length(x);
+n = 0:(N-1);
+alpha = (N-1)./2;
+w = 1-(n./alpha - 1).^2;
+xw = x.*w;
+end
+
+function xw = sine(x)
+% Sine window
+N = length(x);
+n = 0:(N-1);
+alpha = (N-1)./pi;
+w = sin(n./alpha);
+xw = x.*w;
+end
+
+function xw = hann(x)
+% Hanning window
+N = length(x);
+n = 0:(N-1);
+alpha = (N-1)./(2*pi);
+w = 0.5*(1-cos(n./alpha));
+xw = x.*w;
+end
+
+function xw = hamm(x)
+% Hamming window
+N = length(x);
+n = 0:(N-1);
+alpha = (N-1)./(2*pi);
+w = 0.54 - 0.46*(cos(n./alpha));
+xw = x.*w;
 end

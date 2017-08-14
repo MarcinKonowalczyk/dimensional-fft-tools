@@ -3,9 +3,16 @@ close all; clear; clc;
 load('test-data.mat');
 
 A = dbkg(A,0,2);
-Y0 = dwin(A,'hann',2,'plot',true);
 
-return
+tic
+Y0 = dwin(A,'rect',2);
+toc
+
+tic
+Y1 = dwin(A,'trigle',2,'plot',true);
+toc
+
+Y2 = dwin(A,'trigle',2,'plot',true);
 
 figure(1);
 subplot(2,2,1);
@@ -16,17 +23,17 @@ title('Original');
 subplot(2,2,2);
 contourf(t,1:1024,Y0,'edgecolor','none');
 grid on;
-title('O = 0');
+title('rect');
 
 subplot(2,2,3);
 contourf(t,1:1024,Y1,'edgecolor','none');
 grid on;
-title('O = 5');
+title('hann');
 
 subplot(2,2,4);
 contourf(t,1:1024,Y2,'edgecolor','none');
 grid on;
-title('O = 10');
+title('hamm');
 
 
  

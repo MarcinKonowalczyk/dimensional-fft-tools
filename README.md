@@ -16,7 +16,6 @@ This adds up to quite a heavy operation which, furthermore, needs to be nested i
 
 ### ToDo's
  - Go through all the WIP notes and put them into this list
- - Make the toolbox independant of `Window Designer` app by writing own window functions
  - Add more toolbox description to this doc
  - Figure out how to avoid using sliceDone matrix. this should improve the performance (<- Major restructuring needed)
  - Add more examples to `dfun` documentation
@@ -24,6 +23,7 @@ This adds up to quite a heavy operation which, furthermore, needs to be nested i
  - Add `@fun` output size > vector to `dfun` for numeric and logical outputs
  - Make sure that if `@fun` output is a string, `dfun` works correctly
  - Allow fof `dfun` & `partcell` to operate on subsets of the dimentions; e.g. 2:5 of length(10) dimention. ?? (Not sure if needed/useful)
+ - Add more window funcitons to `dwin`
 
  ### Style guide
  * The functions should be written in such a way, as to reduce depndencies complexity. This means that all the functions should be kept to a small number of files (preferably all in one file). It also means not using MATLAB toolboxes unless necessarry. The reasoning behind this is to keep the toolbox easy to take apart and use in one's own ways.
