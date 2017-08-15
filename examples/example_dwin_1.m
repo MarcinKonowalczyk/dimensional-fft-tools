@@ -9,10 +9,10 @@ Y0 = dwin(A,'rect',2);
 toc
 
 tic
-Y1 = dwin(A,'trigle',2,'plot',true);
+Y1 = dwin(A,'welch',2);
 toc
 
-Y2 = dwin(A,'trigle',2,'plot',true);
+Y2 = dwin(A,'trigle',2);
 
 figure(1);
 subplot(2,2,1);
@@ -28,12 +28,12 @@ title('rect');
 subplot(2,2,3);
 contourf(t,1:1024,Y1,'edgecolor','none');
 grid on;
-title('hann');
+title('welch');
 
 subplot(2,2,4);
 contourf(t,1:1024,Y2,'edgecolor','none');
 grid on;
-title('hamm');
+title('triangle');
 
 
  
