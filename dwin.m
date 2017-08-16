@@ -99,7 +99,8 @@ N = length(x);
 n = 0:(N-1);
 alpha = (N-1)./2;
 w = 1-abs(n./alpha - 1);
-xw = x.*w;
+cpg = trapz(w)/N;
+xw = x.*w./cpg;
 end
 
 function w = parzen(N)
@@ -121,7 +122,8 @@ N = length(x);
 n = 0:(N-1);
 alpha = (N-1)./2;
 w = 1-(n./alpha - 1).^2;
-xw = x.*w;
+cpg = trapz(w)/N;
+xw = x.*w./cpg;
 end
 
 function xw = sine(x)
@@ -130,7 +132,8 @@ N = length(x);
 n = 0:(N-1);
 alpha = (N-1)./pi;
 w = sin(n./alpha);
-xw = x.*w;
+cpg = trapz(w)/N;
+xw = x.*w./cpg;
 end
 
 function xw = hann(x)
@@ -139,7 +142,8 @@ N = length(x);
 n = 0:(N-1);
 alpha = (N-1)./(2*pi);
 w = 0.5*(1-cos(n./alpha));
-xw = x.*w;
+cpg = trapz(w)/N;
+xw = x.*w./cpg;
 end
 
 function xw = hamm(x)
@@ -148,5 +152,6 @@ N = length(x);
 n = 0:(N-1);
 alpha = (N-1)./(2*pi);
 w = 0.54 - 0.46*(cos(n./alpha));
-xw = x.*w;
+cpg = trapz(w)/N;
+xw = x.*w./cpg;
 end

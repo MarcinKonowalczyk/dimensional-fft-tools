@@ -1,10 +1,10 @@
 function [varargout] = dfft(t,X,n,dim,varargin)
 %% [f,Y] = dfft(t,X,n,dim,...)
 % This function takes the array X and applies a fourier transform along
-% each 1D slice along the dimention specified by `dim`. It also calculates 
+% each 1D slice along the dimention specified by `dim`. It also calculates
 %
 % SYNTAX
-% 
+%
 
 %% Parse input
 narginchk(1,Inf);
@@ -44,10 +44,14 @@ else
     assert(n == fix(n),'`n` supplied(%d) mist be an integer',n);
 end
 
+valid.bool = @(x) islogical(x) && isequal(size(x),[1 1]); % Is a valid T/F flag
+valid.outputNames = {'trim', 'shift', 'fast'};
+valid.output = @(x) any(cellfun(@(y) strcmp(x,y),valid.outputNames));
+
 p = inputParser;
 p.KeepUnmatched = true;
-addOptional(p,'abs',true);
-addOptional(p,'trim',true);
+addOptional(p,'abs',true,valid.bool);
+addOptional(p,'output','trim',valid.output);
 parse(p,varargin{:});
 opt = p.Results;
 
@@ -73,25 +77,47 @@ end
 S.type = '()';
 S.subs = num2cell(repmat(':',1,length(size(X))));
 
-iseven = ~mod(n,2); % Is number of fft points even
-if iseven
-    len = n/2+1;
-    f = linspace(0,0.5,len)./dt;
-else
-    len = ceil(n/2);
-    f = linspace(0,0.5 - 1/(2*n), len)./dt;
-end
-
-S.subs{dim} = 1:len;
-Y = subsref(Y,S);
-
-if opt.trim
-    if iseven
-        S.subs{dim} = 2:len-1;
-    else
-        S.subs{dim} = 2:len;
-    end
-    Y = subsasgn(Y,S,2.*subsref(Y,S));
+iseven = ~mod(n,2); % If number of fft points even
+% WIP: add more modes to opt.trim: 'shift', 'trim', 'fast'
+switch opt.output
+    case 'trim' % Trim to the positive frequency componets only
+        if iseven
+            len = n/2+1;
+            f = linspace(0,0.5,len)./dt;
+        else
+            len = ceil(n/2);
+            db = 1/n; % delta-bin - bin spacing
+            f = linspace(0,0.5 - db/2, len)./dt;
+        end
+        S.subs{dim} = 1:len;
+        Y = 2*subsref(Y,S);
+    case 'shift' % Shift the spectrum with fftshift
+        len = n;
+        if iseven
+            % create 1-too-long freqyency vector and trim the end to avoid
+            % doubling up on nyquist
+            f = linspace(-0.5,0.5,len+1)./dt;
+            f(end) = [];
+        else
+            db = 1/n; % delta-bin - bin spacing
+            f = linspace(-0.5 + db/2,0.5 - db/2, len)./dt;
+        end
+        %f = fftshift(f,2);
+        %f(end) = [];
+        Y = fftshift(Y,dim);
+    case 'fast'
+        if nargout > 1 % Make frequency axis only if needed
+            if iseven
+                % WIP: do this better
+                f = linspace(0,1,n+1)./dt;
+                f(end) = [];
+            else
+                db = 1/n; % delta-bin - bin spacing
+                f = linspace(0 + db/2,1 - db/2, n)./dt;
+            end
+        end
+    otherwise
+        throw(teapot);
 end
 
 % Output
@@ -100,8 +126,16 @@ if nargout <2
 else % nargout == 2
     varargout = {Y,f};
 end
-
 end
 
+function y = fftshift(x,dim)
+%% x = fftshift(x,dim)
+% In-built fftshift implementation. It is analogous to Matlab's `fftshift`
+% function. It shifts zero-frequency component of the spectrum to the
+% center.
+
+k = floor(size(x,dim)./2); % Half the length of the spectrum along `dim`
+y = circshift(x,k,dim); % Circular shift
+end
 
 
