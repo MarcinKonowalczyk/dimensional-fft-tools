@@ -4,8 +4,38 @@ function [varargout] = dbkg(X,o,dim,varargin)
 % function from the data along the 'dim' dimention.
 %
 % SYNTAX
-% ...
+%  Y = dbkg(X);
+%  Y = dbkg(X,o);
+%  Y = dbkg(X,o,dim);
+%  Y = dbkg(X,o,dim,...);
 % 
+%  [Y,dY] = dbkg(...);
+%  [Y,dY,P] = dbkg(...);
+%  [Y,dY,P,S] = dbkg(...);
+%  [Y,dY,P,S,Mu] = dbkg(...);
+%
+%  X   - Input numeric matrix.
+%  o   - Order of the polynomial to fit as a background function. When no
+%        `o` is supplied or `o` is empty ([]), it defults to 0 i.e. mean of
+%        each slice of X.
+%  dim - The dimention of X to subtract the background from. This function
+%        subtracts the background from each 1D slice of X along dim -
+%        linear fit (as opposed to for example a sufrace fit to a 2D slice
+%        of X). If this input is left empty then it defaults to the first
+%        non-singleton dimension of X it can find.
+%
+%  Y   - Processed X.
+%  dY  - Estimate of the standard deviation undertainty in the background
+%        fit at each point of Y. This matrix has one more dimention than Y
+%        which describes the lower/upper boundnes of the uncertainty.
+%        For more information see `delta` output of the `polyval` function.
+%  P   - Polynomial fit coefficients. Similarilly to dY, this output matrix
+%        is expanded by a dimention which describes the order of the
+%        polynomial coefficient. See documentation for `polyfit` for more
+%        details on `p`.
+%  S   - See documentation for `polyfit` for information on `s`.
+%  Mu  - See documentation for `polyfit` for information on `mu`.
+%
 % EXAMPLES
 % ...
 %  for j = 1:16;
