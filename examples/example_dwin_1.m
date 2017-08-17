@@ -5,7 +5,7 @@ load('test-data.mat');
 A = dbkg(A,0,2);
 
 tic
-Y0 = dwin(A,'rect',2);
+Y0 = dwin(A,'parzen',2,'plot',true);
 toc
 
 tic

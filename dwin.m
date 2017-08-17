@@ -36,7 +36,7 @@ end
 
 valid.output = @(x) any(cellfun(@(y) strcmp(x,y),{'subtract', 'fit', 'divide'}));
 valid.num = @(x) isnumeric(x) && isequal(size(x),[1 1]);
-valid.windowNames = {'', 'none', 'rect', 'trigle','welch','sine','hann', 'hamm'};
+valid.windowNames = {'', 'none', 'rect', 'trigle','parzen','welch','sine','hann', 'hamm'};
 valid.bool = @(x) islogical(x) && isequal(size(x),[1 1]); % Is a valid T/F flag
 valid.windowType = @(x) any(cellfun(@(y) strcmp(x,y),valid.windowNames)) || valid.bool(x);
 
@@ -75,6 +75,7 @@ teapot = MException('dwin:Error418','I''m a teapot'); % Idiot error. This should
 % WIP: add more windows
 switch type
     case 'trigle', fun = @trigle;
+    case 'parzen', fun = @persistent_parzen;
     case 'welch', fun = @welch;
     case 'sine', fun = @sine;
     case 'hann', fun = @hann;
@@ -90,7 +91,7 @@ else
 end
 
 %% Apply dfun
-Y = dfun(X,fun,dim,[],'plot',opt.plot);
+Y = dfun(X,fun,dim,[],'plot',opt.plot,'plotpause',opt.plotpause);
 end
 
 function xw = trigle(x)
@@ -100,20 +101,8 @@ n = 0:(N-1);
 alpha = (N-1)./2;
 w = 1-abs(n./alpha - 1);
 cpg = trapz(w)/N;
-xw = x.*w./cpg;
-end
-
-function w = parzen(N)
-% Parzen window
-% WIP...
-n = 0:(N-1);
-w = zeros(1,N);
-for ni = 1:N
-    cn = n(ni);
-    if n < N/4
-    else
-    end
-end
+w = w./cpg;
+xw = x.*w;
 end
 
 function xw = welch(x)
@@ -123,7 +112,8 @@ n = 0:(N-1);
 alpha = (N-1)./2;
 w = 1-(n./alpha - 1).^2;
 cpg = trapz(w)/N;
-xw = x.*w./cpg;
+w = w./cpg;
+xw = x.*w;
 end
 
 function xw = sine(x)
@@ -133,7 +123,8 @@ n = 0:(N-1);
 alpha = (N-1)./pi;
 w = sin(n./alpha);
 cpg = trapz(w)/N;
-xw = x.*w./cpg;
+w = w./cpg;
+xw = x.*w;
 end
 
 function xw = hann(x)
@@ -143,7 +134,8 @@ n = 0:(N-1);
 alpha = (N-1)./(2*pi);
 w = 0.5*(1-cos(n./alpha));
 cpg = trapz(w)/N;
-xw = x.*w./cpg;
+w = w./cpg;
+xw = x.*w;
 end
 
 function xw = hamm(x)
@@ -153,5 +145,42 @@ n = 0:(N-1);
 alpha = (N-1)./(2*pi);
 w = 0.54 - 0.46*(cos(n./alpha));
 cpg = trapz(w)/N;
-xw = x.*w./cpg;
+w = w./cpg;
+xw = x.*w;
+end
+
+function xw = parzen(x)
+% Parzen window
+N = length(x);
+[xw] = core_parzen(x,N);
+end
+
+function xw = persistent_parzen(x)
+% Parzen window with persistance
+% This save
+persistent N;
+persistent w;
+
+if isempty(N) || N ~= length(x);
+    N = length(x);
+else
+    xw = x.*w;
+    return;
+end
+[xw,w] = core_parzen(x,N);
+end
+
+function [xw,w] = core_parzen(x,N)
+% Core of the Parzen window functions
+% https://uk.mathworks.com/help/signal/ref/parzenwin.html
+n = abs(linspace(-(N-1)/2,(N-1)/2,N));
+w = zeros(1,N);
+
+isCenter = n <= (N-1)/4;
+w(isCenter) = 1 - 6*(n(isCenter)/N*2).^2 + 6*(n(isCenter)/N*2).^3;
+w(~isCenter) = 2*(1-n(~isCenter)/N*2).^3;
+
+cpg = trapz(w)/N;
+w = w./cpg;
+xw = x.*w;
 end
