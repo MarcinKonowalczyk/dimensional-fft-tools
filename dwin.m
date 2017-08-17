@@ -36,7 +36,7 @@ end
 
 valid.output = @(x) any(cellfun(@(y) strcmp(x,y),{'subtract', 'fit', 'divide'}));
 valid.num = @(x) isnumeric(x) && isequal(size(x),[1 1]);
-valid.windowNames = {'', 'none', 'rect', 'trigle','welch','sine','hann', 'hamm'};
+valid.windowNames = {'', 'none', 'rect', 'trigle','welch','sine','hann', 'hamm','flat'};
 valid.bool = @(x) islogical(x) && isequal(size(x),[1 1]); % Is a valid T/F flag
 valid.windowType = @(x) any(cellfun(@(y) strcmp(x,y),valid.windowNames)) || valid.bool(x);
 
@@ -79,6 +79,7 @@ switch type
     case 'sine', fun = @sine;
     case 'hann', fun = @hann;
     case 'hamm', fun = @hamm;
+    case 'flat', fun = @flat;
     otherwise
         throw(teapot);
 end
@@ -152,6 +153,18 @@ N = length(x);
 n = 0:(N-1);
 alpha = (N-1)./(2*pi);
 w = 0.54 - 0.46*(cos(n./alpha));
+cpg = trapz(w)/N;
+xw = x.*w./cpg;
+end
+
+function xw = flat(x)
+% Flattop window
+% uk.mathworks.com/help/signal/ref/flattopwin.html
+N = length(x);
+n = 0:(N-1);
+alpha = (N-1)./(2*pi);
+a = [0.21557895 0.41663158 0.277263158 0.083578947 0.006947368];
+w = a(1) - a(2).*cos(n./alpha) + a(3).*cos(2.*n./alpha) - a(4).*cos(3.*n./alpha) + a(5).*cos(4.*n./alpha);
 cpg = trapz(w)/N;
 xw = x.*w./cpg;
 end

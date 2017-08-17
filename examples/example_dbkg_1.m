@@ -1,5 +1,9 @@
 close all; clear; clc;
 
+p = path;
+path(path,fileparts(pwd));
+cleaner = onCleanup(@() path(p));
+
 load('test-data.mat');
 
 Y0 = dbkg(A,0,2,'plot',1);

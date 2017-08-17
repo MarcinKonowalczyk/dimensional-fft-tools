@@ -1,5 +1,9 @@
 close all; clear; clc;
 
+p = path;
+path(path,fileparts(pwd));
+cleaner = onCleanup(@() path(p));
+
 load('test-data.mat');
 
 o = 2;

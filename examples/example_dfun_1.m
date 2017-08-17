@@ -1,4 +1,9 @@
 close all; clear; clc;
+
+p = path;
+path(path,fileparts(pwd));
+cleaner = onCleanup(@() path(p));
+
 load spectra % loads matlab sample data
 %{
 %% dfun is working correctly

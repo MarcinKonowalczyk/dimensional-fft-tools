@@ -1,11 +1,15 @@
 close all; clear; clc;
 
+p = path;
+path(path,fileparts(pwd));
+cleaner = onCleanup(@() path(p));
+
 load('test-data.mat');
 
 A = dbkg(A,0,2);
 
 tic
-Y0 = dwin(A,'rect',2);
+Y0 = dwin(A,'flat',2);
 toc
 
 tic

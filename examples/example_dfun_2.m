@@ -1,5 +1,9 @@
 close all; clear; clc;
 
+p = path;
+path(path,fileparts(pwd));
+cleaner = onCleanup(@() path(p));
+
 load('test-data.mat');
 
 A_std_1 = dfun(A,@std,1);
