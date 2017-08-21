@@ -45,7 +45,7 @@ else
 end
 
 valid.bool = @(x) islogical(x) && isequal(size(x),[1 1]); % Is a valid T/F flag
-valid.outputNames = {'trim', 'shift', 'fast'};
+valid.outputNames = {'trim', 'power', 'shift', 'fast'};
 valid.output = @(x) any(cellfun(@(y) strcmp(x,y),valid.outputNames));
 
 p = inputParser;
@@ -80,7 +80,9 @@ S.subs = num2cell(repmat(':',1,length(size(X))));
 iseven = ~mod(n,2); % If number of fft points even
 % WIP: add more modes to opt.trim: 'shift', 'trim', 'fast'
 switch opt.output
-    case 'trim' % Trim to the positive frequency componets only
+    case {'trim', 'power'} % Trim to the positive frequency componets only
+        
+        % Create frequency axis
         if iseven
             len = n/2+1;
             f = linspace(0,0.5,len)./dt;
@@ -89,15 +91,30 @@ switch opt.output
             db = 1/n; % delta-bin - bin spacing
             f = linspace(0,0.5 - db/2, len)./dt;
         end
+        
         S.subs{dim} = 1:len;
-        Y = 2*subsref(Y,S);
-    case 'shift' % Shift the spectrum with fftshift
+        Y = subsref(Y,S);
+        
+        % Double the non-unique bins of the fft
+        if iseven % Nyquist is unique
+            S.subs{dim} = 2:len-1;
+        else % Only DC is unique
+            S.subs{dim} = 2:len;
+        end
+        Y = subsasgn(Y,S,2.*Y);
+        
+        % Convert to power spectral density if desired
+        if strcmp(opt.oputput,'power')
+            Y = Y.^2;
+        end
+        
+    case 'shift' % Shift the rms spectrum with fftshift
+        
+        % Create frequency axis
         len = n;
         if iseven
-            % create 1-too-long freqyency vector and trim the end to avoid
-            % doubling up on nyquist
-            f = linspace(-0.5,0.5,len+1)./dt;
-            f(end) = [];
+            % Create 1-too-long frequency vector and trim the end to avoid doubling up on nyquist
+            f = linspace(-0.5,0.5,len+1)./dt; f(end) = [];
         else
             db = 1/n; % delta-bin - bin spacing
             f = linspace(-0.5 + db/2,0.5 - db/2, len)./dt;
@@ -105,19 +122,20 @@ switch opt.output
         %f = fftshift(f,2);
         %f(end) = [];
         Y = fftshift(Y,dim);
-    case 'fast'
-        if nargout > 1 % Make frequency axis only if needed
+        
+    case 'fast' % Do as little work as possible
+        
+        % Make frequency axis only if needed
+        if nargout > 1
             if iseven
-                % WIP: do this better
-                f = linspace(0,1,n+1)./dt;
-                f(end) = [];
+                f = linspace(0,1,n+1)./dt; f(end) = [];
             else
                 db = 1/n; % delta-bin - bin spacing
                 f = linspace(0 + db/2,1 - db/2, n)./dt;
             end
         end
-    otherwise
-        throw(teapot);
+        
+    otherwise, throw(teapot);
 end
 
 % Output
@@ -137,5 +155,3 @@ function y = fftshift(x,dim)
 k = floor(size(x,dim)./2); % Half the length of the spectrum along `dim`
 y = circshift(x,k,dim); % Circular shift
 end
-
-
